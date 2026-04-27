@@ -1,5 +1,6 @@
 import subprocess
 import re
+from html import unescape
 
 
 def fetch_todos(config):
@@ -26,7 +27,7 @@ def fetch_todos(config):
         m = re.match(r'\s*([○●])\s+\d+\.\s+(.*)', line)
         if m:
             todos.append({
-                'title': m.group(2).strip(),
+                'title': unescape(m.group(2).strip()),
                 'done': m.group(1) == '●',
             })
 
