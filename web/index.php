@@ -254,7 +254,7 @@ $regular_count = count($news_regular);
         <li>
             <a href="<?php echo h($item['url']); ?>" target="_blank"><?php echo h($item['title']); ?></a>
             <?php if ($item['source'] === 'HN' && $item['score'] !== null): ?>
-            <span class="hn-meta"><?php echo h($item['score']); ?> pts &middot; <?php echo h($item['comments']); ?> comments</span>
+            <span class="hn-meta"><?php echo h($item['score']); ?> pts &middot; <a href="https://news.ycombinator.com/item?id=<?php echo h($item['id']); ?>" target="_blank"><?php echo h($item['comments']); ?> comments</a></span>
             <?php endif; ?>
             <span class="source-tag"><?php echo h($item['source']); ?></span>
         </li>
