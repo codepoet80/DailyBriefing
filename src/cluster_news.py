@@ -81,9 +81,25 @@ def cluster_stories(stories, threshold=0.65, importance_threshold=2):
                 'url': s['url'],
                 'summary': s.get('summary', ''),
                 'source': s['source'],
+                'published_ts': s.get('published_ts', 0),
             })
 
     important.sort(key=lambda x: x['source_count'], reverse=True)
+
+    # Cap each source to its fair share, then sort by recency
+    num_sources = len({s['source'] for s in stories if not s.get('geek_only')})
+    if num_sources > 1:
+        per_source_cap = max(3, len(regular) // num_sources)
+        source_counts = {}
+        capped = []
+        for story in regular:
+            src = story['source']
+            if source_counts.get(src, 0) < per_source_cap:
+                capped.append(story)
+                source_counts[src] = source_counts.get(src, 0) + 1
+        regular = capped
+
+    regular.sort(key=lambda x: x.get('published_ts', 0), reverse=True)
 
     return important, regular
 

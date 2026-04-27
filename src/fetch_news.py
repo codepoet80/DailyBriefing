@@ -2,6 +2,7 @@ import feedparser
 import requests
 import re
 import html as html_module
+import time as time_module
 
 FEED_TIMEOUT = 15
 
@@ -20,6 +21,7 @@ def fetch_news(feeds_config):
             count = min(len(d.entries), 20)
             print('      ' + str(count) + ' stories')
             for entry in d.entries[:20]:
+                pub = entry.get('published_parsed') or entry.get('updated_parsed')
                 stories.append({
                     'title': entry.get('title', '').strip(),
                     'url': entry.get('link', ''),
@@ -31,6 +33,7 @@ def fetch_news(feeds_config):
                     'source_tech': feed.get('tech', False),
                     'always_important': feed.get('always_important', False),
                     'verge_wired_pair': feed.get('verge_wired_pair', False),
+                    'published_ts': time_module.mktime(pub) if pub else 0,
                 })
         except Exception as e:
             print('Warning: Could not fetch feed ' + feed['name'] + ': ' + str(e))
