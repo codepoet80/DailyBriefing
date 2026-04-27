@@ -8,6 +8,9 @@ if (empty($url)) {
     exit;
 }
 
+// Proxy URL — streams audio through our server with correct Content-Type
+$proxy_url = 'stream.php?url=' . urlencode($url);
+
 function h($str) {
     return htmlspecialchars((string)$str, ENT_QUOTES, 'UTF-8');
 }

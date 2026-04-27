@@ -1,3 +1,4 @@
+import base64
 import feedparser
 import requests
 
@@ -6,12 +7,18 @@ FETCH_TIMEOUT = 15
 
 def fetch_podcast(config):
     podcast_cfg = config.get('podcast', {})
-    feed_url = podcast_cfg.get('feed_url', 'https://feeds.npr.org/510318/podcast.xml')
-    name = podcast_cfg.get('name', 'NPR Up First')
+    feed_url  = podcast_cfg.get('feed_url', 'https://feeds.npr.org/510318/podcast.xml')
+    name      = podcast_cfg.get('name', 'NPR Up First')
+    proxy_base = podcast_cfg.get('proxy_base_url', '')
 
-    print('    ' + name + ' <- ' + feed_url)
+    if proxy_base:
+        fetch_url = proxy_base + base64.b64encode(feed_url.encode()).decode()
+        print('    ' + name + ' <- proxy -> ' + feed_url)
+    else:
+        fetch_url = feed_url
+        print('    ' + name + ' <- ' + feed_url)
     try:
-        resp = requests.get(feed_url, timeout=FETCH_TIMEOUT,
+        resp = requests.get(fetch_url, timeout=FETCH_TIMEOUT,
                             headers={'User-Agent': 'DailyBriefing/1.0'})
         resp.raise_for_status()
         d = feedparser.parse(resp.content)

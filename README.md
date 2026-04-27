@@ -13,7 +13,7 @@ Runs on macOS or Raspberry Pi. Frontend is compatible with a 2011 webOS TouchPad
 - Todo list (from `checkmate`)
 - Top news stories (cross-source clustered)
 - More news (collapsible)
-- Hacker News top stories
+- Geek News — HackerNews + Slashdot combined
 - Family calendar — full week, grouped by day
 - Tomorrow preview (afternoon run only)
 - XKCD (when a new comic is out)
@@ -38,6 +38,20 @@ Add to crontab for automatic updates:
 30 11 * * * /path/to/daily-briefing/run.sh
 30 16 * * * /path/to/daily-briefing/run.sh
 ```
+
+## News feeds (`config/feeds.json`)
+
+Each entry is an RSS feed. Optional flags control how stories are elevated to Top Stories:
+
+| Flag | Effect |
+|------|--------|
+| `"always_important": true` | Every story from this feed is elevated to Top Stories regardless of cross-source matching |
+| `"verge_wired_pair": true` | Elevated if 2+ feeds sharing this flag cover the same story |
+| `"geek_only": true` | Excluded from Top Stories / More News; appears only in the Geek News section |
+
+Cross-source matching is controlled in `config.json`:
+- `similarity_threshold` — how closely two headlines must match to count as the same story (default `0.65`, lower = broader net)
+- `importance_threshold` — how many sources must cover a story to elevate it (default `2`)
 
 ## Requirements
 

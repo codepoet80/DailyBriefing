@@ -54,7 +54,7 @@
     "tier": "tech",
     "region": "global",
     "tech": true,
-    "always_important": true
+    "geek_only": true
   },
   {
     "name": "The Verge",
@@ -67,6 +67,22 @@
   {
     "name": "Wired",
     "url": "https://www.wired.com/feed/rss",
+    "tier": "tech",
+    "region": "global",
+    "tech": true,
+    "verge_wired_pair": true
+  },
+  {
+    "name": "Example — always elevated",
+    "url": "https://example.com/rss",
+    "tier": "tech",
+    "region": "global",
+    "tech": false,
+    "always_important": true
+  },
+  {
+    "name": "Example — paired elevation",
+    "url": "https://example.com/rss",
     "tier": "tech",
     "region": "global",
     "tech": true,
