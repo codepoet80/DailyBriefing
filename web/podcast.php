@@ -110,21 +110,24 @@ body {
     <a class="back" href="javascript:window.close()">Close</a>
 </div>
 <script type="text/javascript">
-var audio = new Audio('<?php echo h($url); ?>');
+// Use a DOM audio element — old WebKit builds won't route new Audio() to hardware
+var audio = document.createElement('audio');
+audio.src = '<?php echo h($url); ?>';
+document.body.appendChild(audio);
 var playing = false;
 
-audio.addEventListener('timeupdate', function() {
+audio.ontimeupdate = function() {
     if (audio.duration) {
         var pct = (audio.currentTime / audio.duration) * 100;
         document.getElementById('progress-fill').style.width = pct + '%';
         document.getElementById('time-display').innerHTML = fmt(audio.currentTime) + ' / ' + fmt(audio.duration);
     }
-});
+};
 
-audio.addEventListener('ended', function() {
+audio.onended = function() {
     playing = false;
     document.getElementById('playbtn').innerHTML = '&#9654; Play';
-});
+};
 
 function togglePlay() {
     if (playing) {
