@@ -23,6 +23,7 @@ function h($str) {
     return htmlspecialchars((string)$str, ENT_QUOTES, 'UTF-8');
 }
 
+$greeting        = isset($briefing['greeting'])        ? $briefing['greeting']        : array();
 $verse           = isset($briefing['verse'])           ? $briefing['verse']           : array();
 $servers         = isset($briefing['servers'])         ? $briefing['servers']         : null;
 $weather         = isset($briefing['weather'])         ? $briefing['weather']         : null;
@@ -37,6 +38,7 @@ $hackernews      = isset($briefing['hackernews'])      ? $briefing['hackernews']
 $xkcd            = isset($briefing['xkcd'])            ? $briefing['xkcd']            : null;
 $generated_at    = isset($briefing['generated_at'])    ? $briefing['generated_at']    : '';
 $run_type        = isset($briefing['run_type'])        ? $briefing['run_type']        : '';
+$unifi           = isset($briefing['unifi'])           ? $briefing['unifi']           : null;
 
 $today_label   = date('l, F j, Y');
 $tomorrow_label = date('l, F j', strtotime('+1 day'));
@@ -59,6 +61,20 @@ $regular_count = count($news_regular);
 </head>
 <body>
 
+<?php if (!empty($greeting)): ?>
+<div class="section section-greeting">
+    <div class="greeting-text"><?php echo h($greeting['greeting']); ?></div>
+    <?php if (!empty($greeting['quote'])): ?>
+    <blockquote class="greeting-quote">
+        &ldquo;<?php echo h($greeting['quote']); ?>&rdquo;
+        <?php if (!empty($greeting['author'])): ?>
+        <i>&mdash; <?php echo h($greeting['author']); ?></i>
+        <?php endif; ?>
+    </blockquote>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if (!empty($verse)): ?>
 <div class="section verse-section">
     <div class="verse-label">Verse of the Day</div>
@@ -80,6 +96,41 @@ $regular_count = count($news_regular);
         <?php endif; ?>
     <?php endforeach; ?>
     <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($unifi && $unifi['total_events'] > 0): ?>
+<div class="section section-unifi">
+    <div id="unifi-toggle" class="expander" onclick="toggleUnifi()">&#9658; Security &mdash; <?php echo (int)$unifi['total_events']; ?> event<?php echo $unifi['total_events'] !== 1 ? 's' : ''; ?> overnight (<?php echo h($unifi['window_label']); ?>)</div>
+    <div id="unifi-detail" style="display:none">
+        <?php if (!empty($unifi['smart'])): ?>
+        <div class="unifi-summary">
+            <?php foreach ($unifi['smart'] as $label => $count): ?>
+            <span class="unifi-badge"><?php echo h($count); ?> <?php echo h($label); ?></span>
+            <?php endforeach; ?>
+            <?php if ($unifi['motion'] > 0): ?>
+            <span class="unifi-badge unifi-badge-motion"><?php echo (int)$unifi['motion']; ?> motion</span>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($unifi['cameras'])): ?>
+        <table class="unifi-cameras">
+            <?php foreach ($unifi['cameras'] as $cam): ?>
+            <tr>
+                <td class="unifi-cam-name"><?php echo h($cam['name']); ?></td>
+                <td class="unifi-cam-detail">
+                    <?php foreach ($cam['smart'] as $label => $count): ?>
+                    <span class="unifi-badge"><?php echo h($count); ?> <?php echo h($label); ?></span>
+                    <?php endforeach; ?>
+                    <?php if ($cam['motion'] > 0): ?>
+                    <span class="unifi-badge unifi-badge-motion"><?php echo (int)$cam['motion']; ?> motion</span>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </table>
+        <?php endif; ?>
+    </div>
 </div>
 <?php endif; ?>
 
@@ -302,6 +353,23 @@ function toggleHN() {
     } else {
         el.style.display = 'none';
         btn.innerHTML = '&#9658; Hacker News (' + count + ')';
+        btn.className = 'expander';
+    }
+}
+
+function toggleUnifi() {
+    var el  = document.getElementById('unifi-detail');
+    var btn = document.getElementById('unifi-toggle');
+    var total = <?php echo $unifi ? (int)$unifi['total_events'] : 0; ?>;
+    var window_label = '<?php echo $unifi ? h($unifi['window_label']) : ''; ?>';
+    var label = 'Security \u2014 ' + total + ' event' + (total !== 1 ? 's' : '') + ' overnight (' + window_label + ')';
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        btn.innerHTML = '&#9660; Security';
+        btn.className = 'expander expander-open';
+    } else {
+        el.style.display = 'none';
+        btn.innerHTML = '&#9658; ' + label;
         btn.className = 'expander';
     }
 }

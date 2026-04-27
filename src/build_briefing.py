@@ -9,6 +9,7 @@ socket.setdefaulttimeout(20)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from fetch_greeting import fetch_greeting
 from fetch_verse import fetch_verse
 from fetch_calendars import fetch_calendars
 from fetch_todos import fetch_todos
@@ -19,6 +20,7 @@ from fetch_news import fetch_news
 from cluster_news import cluster_stories
 from fetch_hackernews import fetch_hackernews
 from fetch_xkcd import fetch_xkcd
+from fetch_unifi import fetch_unifi
 
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -49,6 +51,9 @@ def main():
     include_tomorrow = (run_type == 'afternoon')
 
     print('Building briefing (' + run_type + ')...')
+
+    print('  Fetching greeting...')
+    greeting = fetch_greeting(config)
 
     print('  Fetching verse...')
     verse = fetch_verse(config)
@@ -90,9 +95,13 @@ def main():
     print('  Fetching XKCD...')
     xkcd = fetch_xkcd(DATA_DIR)
 
+    print('  Fetching Unifi security events...')
+    unifi = fetch_unifi(config)
+
     briefing = {
         'generated_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
         'run_type': run_type,
+        'greeting': greeting,
         'verse': verse,
         'servers': servers,
         'weather': weather,
@@ -105,6 +114,7 @@ def main():
         'news_regular': news_regular,
         'hackernews': hackernews,
         'xkcd': xkcd,
+        'unifi': unifi,
     }
 
     output_path = os.path.join(DATA_DIR, 'briefing.json')

@@ -41,6 +41,39 @@ h2 {
     margin-bottom: 10px;
 }
 
+/* ---- Greeting ---- */
+.section-greeting {
+    text-align: center;
+    padding: 18px 24px 14px;
+}
+
+.greeting-text {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 22px;
+    font-weight: bold;
+    color: #222;
+    margin-bottom: 10px;
+}
+
+.greeting-quote {
+    font-size: 14px;
+    font-style: italic;
+    color: #555;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.greeting-author {
+    display: block;
+    font-size: 12px;
+    font-style: normal;
+    color: #999;
+    font-family: Arial, Helvetica, sans-serif;
+    margin-top: 4px;
+}
+
 /* ---- Server Status ---- */
 .section-servers {
     font-family: Arial, Helvetica, sans-serif;
@@ -222,20 +255,6 @@ h2 {
 }
 
 /* ---- Weather ---- */
-.section-weather h2 {
-    color: #2a6096;
-    border-color: #a8c8e8;
-}
-
-.section-weather .expander {
-    color: #2a6096;
-    font-size: 15px;
-}
-
-.section-weather .expander-open {
-    font-size: 15px;
-}
-
 .wx-today {
     margin-bottom: 10px;
 }
@@ -304,11 +323,6 @@ h2 {
 }
 
 /* ---- Todos ---- */
-.section-todos h2 {
-    color: #27617a;
-    border-color: #a0ccd8;
-}
-
 .todo-list {
     padding-left: 22px;
 }
@@ -323,18 +337,22 @@ h2 {
     border-bottom: none;
 }
 
-/* ---- Expander (shared by news sections) ---- */
+/* ---- Expander (shared by collapsible sections) ---- */
 .expander {
     cursor: pointer;
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 13px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
     color: #666;
-    padding: 4px 0;
 }
 
 .expander-open {
-    font-weight: bold;
     color: #333;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
 }
 
 .expander:hover {
@@ -367,14 +385,6 @@ h2 {
 }
 
 /* ---- Hacker News ---- */
-.section-hn .expander {
-    color: #b94000;
-}
-
-.section-hn .expander:hover {
-    color: #8a2e00;
-}
-
 .hn-list {
     padding-left: 22px;
 }
@@ -397,10 +407,6 @@ h2 {
 }
 
 /* ---- XKCD ---- */
-.section-xkcd h2 {
-    color: #2c3e50;
-}
-
 .xkcd-img {
     display: block;
     max-width: 100%;
@@ -420,7 +426,6 @@ h2 {
 }
 
 .section-family h2 {
-    color: #888;
     border-color: #e0e0e0;
 }
 
@@ -464,12 +469,53 @@ h2 {
 
 /* ---- Tomorrow Preview ---- */
 .section-tomorrow {
-    border-left: 4px solid #7d3c98;
+    border-left: 4px solid #aaa;
 }
 
-.section-tomorrow h2 {
-    color: #7d3c98;
-    border-color: #c9a0dc;
+/* ---- Unifi Security ---- */
+.unifi-summary {
+    margin-bottom: 8px;
+}
+
+.unifi-badge {
+    display: inline-block;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    background: #2e5f8a;
+    color: #fff;
+    padding: 2px 7px;
+    margin: 2px 4px 2px 0;
+}
+
+.unifi-badge-motion {
+    background: #666;
+}
+
+.unifi-cameras {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.unifi-cameras tr {
+    border-top: 1px solid #f0f0f0;
+}
+
+.unifi-cameras td {
+    padding: 4px 6px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+}
+
+.unifi-cam-name {
+    font-weight: bold;
+    color: #444;
+    width: 130px;
+    white-space: nowrap;
+}
+
+.unifi-cam-detail {
+    color: #555;
 }
 
 /* ---- Footer ---- */
