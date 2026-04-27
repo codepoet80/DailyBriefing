@@ -92,11 +92,14 @@ def main():
     print('  Fetching XKCD...')
     xkcd = fetch_xkcd(DATA_DIR)
 
-    print('  Fetching Unifi security events...')
-    unifi = fetch_unifi(config)
-
-    print('  Fetching iMessage overnight activity...')
-    imessage = fetch_imessage(config)
+    if run_type != 'afternoon':
+        print('  Fetching Unifi security events...')
+        unifi = fetch_unifi(config)
+        print('  Fetching iMessage overnight activity...')
+        imessage = fetch_imessage(config)
+    else:
+        unifi = None
+        imessage = None
 
     briefing = {
         'generated_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
