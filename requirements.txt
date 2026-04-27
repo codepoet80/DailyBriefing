@@ -1,0 +1,4 @@
+requests>=2.25.0
+icalendar>=5.0.0
+recurring_ical_events>=2.1.0
+feedparser>=6.0.0

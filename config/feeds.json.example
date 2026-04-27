@@ -1,0 +1,75 @@
+[
+  {
+    "name": "BBC News",
+    "url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "tier": "international",
+    "region": "global",
+    "tech": false
+  },
+  {
+    "name": "AP News",
+    "url": "https://feedx.net/rss/ap.xml",
+    "tier": "international",
+    "region": "us",
+    "tech": false
+  },
+  {
+    "name": "CBC News",
+    "url": "https://www.cbc.ca/cmlink/rss-topstories",
+    "tier": "national",
+    "region": "canada",
+    "tech": false
+  },
+  {
+    "name": "Globe and Mail",
+    "url": "https://www.theglobeandmail.com/arc/outboundfeeds/rss/category/canada/",
+    "tier": "national",
+    "region": "canada",
+    "tech": false
+  },
+  {
+    "name": "The Guardian",
+    "url": "https://www.theguardian.com/world/rss",
+    "tier": "international",
+    "region": "global",
+    "tech": false
+  },
+  {
+    "name": "Cleveland.com",
+    "url": "https://www.cleveland.com/arc/outboundfeeds/rss/",
+    "tier": "local",
+    "region": "us-ohio",
+    "tech": false
+  },
+  {
+    "name": "NPR News",
+    "url": "https://feeds.npr.org/1001/rss.xml",
+    "tier": "national",
+    "region": "us",
+    "tech": false
+  },
+  {
+    "name": "Slashdot",
+    "url": "https://rss.slashdot.org/Slashdot/slashdotMain",
+    "tier": "tech",
+    "region": "global",
+    "tech": true,
+    "always_important": true
+  },
+  {
+    "name": "The Verge",
+    "url": "https://www.theverge.com/rss/index.xml",
+    "tier": "tech",
+    "region": "global",
+    "tech": true,
+    "verge_wired_pair": true
+  },
+  {
+    "name": "Wired",
+    "url": "https://www.wired.com/feed/rss",
+    "tier": "tech",
+    "region": "global",
+    "tech": true,
+    "verge_wired_pair": true
+  }
+]

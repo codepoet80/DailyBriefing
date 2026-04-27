@@ -1,0 +1,13 @@
+# Live config with credentials — use config.json.example as the template
+config/config.json
+
+# Generated data and logs
+data/briefing.json
+data/xkcd_state.json
+data/briefing.log
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo

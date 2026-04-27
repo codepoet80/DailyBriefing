@@ -1,0 +1,53 @@
+{
+  "owncloud": {
+    "base_url": "https://your-owncloud-host.example.com",
+    "username": "your_username",
+    "password": "your_password",
+    "ssl_verify": false
+  },
+  "calendars": {
+    "mine": [
+      {
+        "name": "Work",
+        "url": "/remote.php/dav/calendars/your_username/calendar-name/?export"
+      },
+      {
+        "name": "Personal",
+        "url": "https://calendar.zoho.com/ical/your-private-token-here"
+      }
+    ],
+    "family": [
+      { "name": "Nicole", "url": "https://calendar.zoho.com/ical/..." },
+      { "name": "Ben",    "url": "https://calendar.google.com/..." }
+    ]
+  },
+  "weather": {
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "units": "fahrenheit"
+  },
+  "bible": {
+    "translation": "ESV",
+    "esv_api_key": ""
+  },
+  "hackernews": {
+    "top_count": 25
+  },
+  "news": {
+    "importance_threshold": 2,
+    "similarity_threshold": 0.65,
+    "max_important": 8,
+    "max_regular": 20
+  },
+  "podcast": {
+    "name": "NPR Up First",
+    "feed_url": "https://feeds.npr.org/510318/podcast.xml"
+  },
+  "todos": {
+    "command": "checkmate ls",
+    "count": 8
+  },
+  "calendar_filters": {
+    "exclude_titles": ["Morning Routine"]
+  }
+}

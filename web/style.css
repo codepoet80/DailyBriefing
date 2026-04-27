@@ -1,0 +1,484 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #222;
+    background: #e8e8e4;
+    padding: 10px;
+}
+
+a {
+    color: #1a4a7a;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.section {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 14px 16px;
+    margin: 0 auto 10px auto;
+    max-width: 860px;
+}
+
+h2 {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #666;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+
+/* ---- Server Status ---- */
+.section-servers {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 8px 16px;
+    border-radius: 0;
+}
+
+.servers-up {
+    background: #eaf6ee;
+    border-color: #7bc89a;
+    color: #2a6b45;
+}
+
+.servers-down {
+    background: #fef9e7;
+    border-color: #f0c040;
+    color: #7a5800;
+}
+
+.servers-icon {
+    font-size: 14px;
+    margin-right: 5px;
+}
+
+.servers-site {
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+/* ---- Podcast ---- */
+.section-podcast {
+    background: #1a1a1a;
+    border-color: #333;
+    padding: 10px 16px;
+    display: table;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.podcast-btn {
+    display: inline-block;
+    background: #2e7d6e;
+    color: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 6px 14px;
+    text-decoration: none;
+    vertical-align: middle;
+    margin-right: 12px;
+}
+
+.podcast-btn:hover {
+    background: #235f53;
+    text-decoration: none;
+}
+
+.podcast-title {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    color: #aaa;
+    vertical-align: middle;
+}
+
+/* ---- Verse of the Day ---- */
+.verse-section {
+    background: #1b3a5c;
+    border-color: #0d2438;
+    text-align: center;
+    padding: 10px 24px;
+}
+
+.verse-label {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #7aaed4;
+    margin-bottom: 6px;
+}
+
+.verse-text {
+    font-size: 18px;
+    font-style: italic;
+    color: #ddeeff;
+    line-height: 1.65;
+    margin: 0 0 6px 0;
+    padding: 0;
+    border: none;
+}
+
+.verse-ref {
+    font-size: 13px;
+    color: #7aaed4;
+}
+
+/* ---- Calendar ---- */
+.calendar-list {
+    list-style: none;
+    padding: 0;
+}
+
+.calendar-list li {
+    padding: 5px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 15px;
+}
+
+.calendar-list li:last-child {
+    border-bottom: none;
+}
+
+.event-time {
+    display: inline-block;
+    width: 85px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #1a4a7a;
+}
+
+.event-title {
+    font-size: 15px;
+}
+
+.event-location {
+    font-size: 12px;
+    color: #888;
+}
+
+.event-cal {
+    font-size: 11px;
+    color: #bbb;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.empty {
+    font-style: italic;
+    color: #aaa;
+    font-size: 14px;
+}
+
+/* ---- Important News ---- */
+.story-card {
+    border-left: 4px solid #4e86c3;
+    background: #f4f7fa;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+
+.story-card:last-child {
+    margin-bottom: 0;
+}
+
+.story-title {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.story-title a {
+    color: #1a4a7a;
+}
+
+.story-summary {
+    font-size: 13px;
+    color: #444;
+    line-height: 1.4;
+    margin-bottom: 5px;
+}
+
+.story-sources {
+    font-size: 11px;
+    color: #999;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ---- Weather ---- */
+.section-weather h2 {
+    color: #2a6096;
+    border-color: #a8c8e8;
+}
+
+.section-weather .expander {
+    color: #2a6096;
+    font-size: 15px;
+}
+
+.section-weather .expander-open {
+    font-size: 15px;
+}
+
+.wx-today {
+    margin-bottom: 10px;
+}
+
+.wx-temp {
+    font-size: 32px;
+    font-weight: bold;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #2a6096;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.wx-condition {
+    font-size: 18px;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #444;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+.wx-meta {
+    display: block;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    color: #777;
+    margin-top: 4px;
+}
+
+.wx-forecast {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.wx-forecast tr {
+    border-top: 1px solid #f0f0f0;
+}
+
+.wx-forecast td {
+    padding: 4px 6px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+}
+
+.wx-day {
+    font-weight: bold;
+    color: #444;
+    width: 90px;
+}
+
+.wx-fc-condition {
+    color: #555;
+}
+
+.wx-fc-temp {
+    color: #2a6096;
+    white-space: nowrap;
+    text-align: right;
+    width: 100px;
+}
+
+.wx-fc-precip {
+    color: #777;
+    text-align: right;
+    width: 60px;
+}
+
+/* ---- Todos ---- */
+.section-todos h2 {
+    color: #27617a;
+    border-color: #a0ccd8;
+}
+
+.todo-list {
+    padding-left: 22px;
+}
+
+.todo-list li {
+    padding: 4px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 15px;
+}
+
+.todo-list li:last-child {
+    border-bottom: none;
+}
+
+/* ---- Expander (shared by news sections) ---- */
+.expander {
+    cursor: pointer;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    color: #666;
+    padding: 4px 0;
+}
+
+.expander-open {
+    font-weight: bold;
+    color: #333;
+}
+
+.expander:hover {
+    color: #1a4a7a;
+}
+
+.news-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 8px;
+}
+
+.news-list li {
+    padding: 4px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 14px;
+}
+
+.news-list li:last-child {
+    border-bottom: none;
+}
+
+.source-tag {
+    font-size: 10px;
+    color: #999;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f0f0f0;
+    padding: 1px 4px;
+    margin-left: 5px;
+}
+
+/* ---- Hacker News ---- */
+.section-hn .expander {
+    color: #b94000;
+}
+
+.section-hn .expander:hover {
+    color: #8a2e00;
+}
+
+.hn-list {
+    padding-left: 22px;
+}
+
+.hn-list li {
+    padding: 4px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 14px;
+}
+
+.hn-list li:last-child {
+    border-bottom: none;
+}
+
+.hn-meta {
+    font-size: 11px;
+    color: #aaa;
+    font-family: Arial, Helvetica, sans-serif;
+    margin-left: 6px;
+}
+
+/* ---- XKCD ---- */
+.section-xkcd h2 {
+    color: #2c3e50;
+}
+
+.xkcd-img {
+    display: block;
+    max-width: 100%;
+    margin: 10px auto;
+}
+
+.xkcd-alt {
+    font-size: 13px;
+    font-style: italic;
+    color: #666;
+}
+
+/* ---- Family Calendar ---- */
+.section-family {
+    background: #f8f8f8;
+    border-color: #ddd;
+}
+
+.section-family h2 {
+    color: #888;
+    border-color: #e0e0e0;
+}
+
+.family-day {
+    margin-bottom: 10px;
+}
+
+.family-day:last-child {
+    margin-bottom: 0;
+}
+
+.family-day-label {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 3px;
+}
+
+.today-badge {
+    font-size: 10px;
+    background: #c0392b;
+    color: #fff;
+    padding: 1px 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-left: 6px;
+}
+
+.event-who {
+    display: inline-block;
+    width: 70px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    color: #888;
+    text-transform: uppercase;
+}
+
+/* ---- Tomorrow Preview ---- */
+.section-tomorrow {
+    border-left: 4px solid #7d3c98;
+}
+
+.section-tomorrow h2 {
+    color: #7d3c98;
+    border-color: #c9a0dc;
+}
+
+/* ---- Footer ---- */
+.footer {
+    text-align: center;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    color: #bbb;
+    padding: 8px;
+    max-width: 860px;
+    margin: 0 auto;
+}
