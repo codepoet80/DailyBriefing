@@ -50,9 +50,38 @@ body {
     margin-left: auto;
     margin-right: auto;
 }
-audio {
+.player-controls {
+    margin-bottom: 20px;
+}
+.play-btn {
+    display: inline-block;
+    background: #2e7d6e;
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    padding: 12px 32px;
+    cursor: pointer;
+    border: none;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.play-btn:hover { background: #235f53; }
+.progress-bar-wrap {
     width: 100%;
     max-width: 560px;
+    height: 6px;
+    background: #333;
+    margin: 16px auto 8px auto;
+    cursor: pointer;
+}
+.progress-bar-fill {
+    height: 6px;
+    background: #2e7d6e;
+    width: 0%;
+}
+.time-display {
+    font-size: 12px;
+    color: #666;
+    font-family: Arial, Helvetica, sans-serif;
 }
 .back {
     display: inline-block;
@@ -70,12 +99,58 @@ audio {
     <div class="show-name"><?php echo h($name); ?></div>
     <?php endif; ?>
     <div class="episode-title"><?php echo h($title); ?></div>
-    <audio controls autoplay>
-        <source src="<?php echo h($url); ?>" type="audio/mpeg">
-        Your browser does not support HTML5 audio.
-    </audio>
+    <div class="player-controls">
+        <button class="play-btn" id="playbtn" onclick="togglePlay()">&#9654; Play</button>
+    </div>
+    <div class="progress-bar-wrap" onclick="seek(event)" id="progress-wrap">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div class="time-display" id="time-display">0:00 / --:--</div>
     <br>
     <a class="back" href="javascript:window.close()">Close</a>
 </div>
+<script type="text/javascript">
+var audio = new Audio('<?php echo h($url); ?>');
+var playing = false;
+
+audio.addEventListener('timeupdate', function() {
+    if (audio.duration) {
+        var pct = (audio.currentTime / audio.duration) * 100;
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('time-display').innerHTML = fmt(audio.currentTime) + ' / ' + fmt(audio.duration);
+    }
+});
+
+audio.addEventListener('ended', function() {
+    playing = false;
+    document.getElementById('playbtn').innerHTML = '&#9654; Play';
+});
+
+function togglePlay() {
+    if (playing) {
+        audio.pause();
+        playing = false;
+        document.getElementById('playbtn').innerHTML = '&#9654; Play';
+    } else {
+        audio.play();
+        playing = true;
+        document.getElementById('playbtn').innerHTML = '&#9646;&#9646; Pause';
+    }
+}
+
+function seek(e) {
+    if (!audio.duration) return;
+    var wrap = document.getElementById('progress-wrap');
+    var rect = wrap.getBoundingClientRect();
+    var pct = (e.clientX - rect.left) / rect.width;
+    audio.currentTime = pct * audio.duration;
+}
+
+function fmt(s) {
+    var m = Math.floor(s / 60);
+    var sec = Math.floor(s % 60);
+    return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+</script>
 </body>
 </html>

@@ -69,8 +69,9 @@ def _fetch_range(url, auth, ssl_verify, start_date, end_date, calendar_name, col
         resp.raise_for_status()
         cal = icalendar.Calendar.from_ical(resp.content)
 
-        start = datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0)
-        end = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59)
+        local_tz = datetime.now().astimezone().tzinfo
+        start = datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0, tzinfo=local_tz)
+        end = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59, tzinfo=local_tz)
 
         events = recurring_ical_events.of(cal).between(start, end)
         return [_parse_event(e, calendar_name, color) for e in events if e is not None]

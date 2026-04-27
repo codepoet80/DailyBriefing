@@ -86,9 +86,9 @@ $regular_count = count($news_regular);
 <?php if ($servers): ?>
 <div class="section section-servers <?php echo $servers['all_up'] ? 'servers-up' : 'servers-down'; ?>">
     <?php if ($servers['all_up']): ?>
-    <span class="servers-icon">&#10003;</span> All Servers Up
+    <span class="servers-icon">√ </span> All Servers Up
     <?php else: ?>
-    <span class="servers-icon">&#9888;</span> Server Issues:
+    <span class="servers-icon">! </span> Server Issues:
     <?php foreach ($servers['sites'] as $site): ?>
         <?php if (!$site['all_up']): ?>
         <span class="servers-site"><?php echo h($site['name']); ?>:</span>
@@ -227,8 +227,8 @@ $regular_count = count($news_regular);
 
 <?php if (!empty($hackernews)): ?>
 <div class="section section-hn">
-    <div id="hn-toggle" class="expander expander-open" onclick="toggleHN()">&#9660; Hacker News (<?php echo count($hackernews); ?>)</div>
-    <div id="hn-list">
+    <div id="hn-toggle" class="expander" onclick="toggleHN()">&#9658; Hacker News (<?php echo count($hackernews); ?>)</div>
+    <div id="hn-list" style="display:none">
     <ol class="hn-list">
         <?php foreach ($hackernews as $item): ?>
         <li>
