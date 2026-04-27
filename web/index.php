@@ -27,7 +27,6 @@ $greeting        = isset($briefing['greeting'])        ? $briefing['greeting']  
 $verse           = isset($briefing['verse'])           ? $briefing['verse']           : array();
 $servers         = isset($briefing['servers'])         ? $briefing['servers']         : null;
 $weather         = isset($briefing['weather'])         ? $briefing['weather']         : null;
-$podcast         = isset($briefing['podcast'])         ? $briefing['podcast']         : null;
 $my_calendar     = isset($briefing['my_calendar'])     ? $briefing['my_calendar']     : array();
 $todos           = isset($briefing['todos'])           ? $briefing['todos']           : array();
 $family_calendar = isset($briefing['family_calendar']) ? $briefing['family_calendar'] : array();
@@ -305,12 +304,6 @@ $regular_count = count($news_regular);
 <?php endif; ?>
 
 
-<?php if ($podcast): ?>
-<div class="section section-podcast">
-    <a class="podcast-btn" href="podcast.php?url=<?php echo urlencode($podcast['audio_url']); ?>&amp;title=<?php echo urlencode($podcast['title']); ?>&amp;name=<?php echo urlencode($podcast['name']); ?>" target="_blank">&#9654; Play <?php echo h($podcast['name']); ?></a>
-    <span class="podcast-title"><?php echo h($podcast['title']); ?></span>
-</div>
-<?php endif; ?>
 
 <p class="footer">Generated <?php echo h($generated_at); ?> &middot; <?php echo h($run_type); ?> run</p>
 

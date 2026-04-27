@@ -13,7 +13,6 @@ from fetch_greeting import fetch_greeting
 from fetch_verse import fetch_verse
 from fetch_calendars import fetch_calendars
 from fetch_todos import fetch_todos
-from fetch_podcast import fetch_podcast
 from fetch_weather import fetch_weather
 from fetch_servers import fetch_servers
 from fetch_news import fetch_news
@@ -71,9 +70,6 @@ def main():
     print('  Fetching weather...')
     weather = fetch_weather(config)
 
-    print('  Fetching podcast...')
-    podcast = fetch_podcast(config)
-
     print('  Fetching todos...')
     todos = fetch_todos(config)
 
@@ -105,7 +101,6 @@ def main():
         'verse': verse,
         'servers': servers,
         'weather': weather,
-        'podcast': podcast,
         'my_calendar': my_calendar,
         'todos': todos,
         'family_calendar': family_calendar,
