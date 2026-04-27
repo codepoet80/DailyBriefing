@@ -38,6 +38,7 @@ $xkcd            = isset($briefing['xkcd'])            ? $briefing['xkcd']      
 $generated_at    = isset($briefing['generated_at'])    ? $briefing['generated_at']    : '';
 $run_type        = isset($briefing['run_type'])        ? $briefing['run_type']        : '';
 $unifi           = isset($briefing['unifi'])           ? $briefing['unifi']           : null;
+$imessage        = isset($briefing['imessage'])        ? $briefing['imessage']        : null;
 
 $today_label   = date('l, F j, Y');
 $tomorrow_label = date('l, F j', strtotime('+1 day'));
@@ -129,6 +130,25 @@ $regular_count = count($news_regular);
             <?php endforeach; ?>
         </table>
         <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($imessage && $imessage['count'] > 0): ?>
+<div class="section section-unifi">
+    <div id="imessage-toggle" class="expander" onclick="toggleImessage()">&#9658; Messages &mdash; <?php echo (int)$imessage['count']; ?> message<?php echo $imessage['count'] !== 1 ? 's' : ''; ?> overnight (<?php echo h($imessage['window_label']); ?>)</div>
+    <div id="imessage-detail" style="display:none">
+        <table class="unifi-cameras">
+            <?php foreach ($imessage['messages'] as $msg): ?>
+            <tr>
+                <td class="unifi-cam-name"><?php echo h($msg['name']); ?></td>
+                <td class="unifi-cam-detail">
+                    <span class="unifi-badge"><?php echo h($msg['time']); ?></span>
+                    <?php echo h($msg['preview']); ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </table>
     </div>
 </div>
 <?php endif; ?>
@@ -362,6 +382,23 @@ function toggleUnifi() {
     if (el.style.display === 'none') {
         el.style.display = 'block';
         btn.innerHTML = '&#9660; Security';
+        btn.className = 'expander expander-open';
+    } else {
+        el.style.display = 'none';
+        btn.innerHTML = '&#9658; ' + label;
+        btn.className = 'expander';
+    }
+}
+
+function toggleImessage() {
+    var el  = document.getElementById('imessage-detail');
+    var btn = document.getElementById('imessage-toggle');
+    var count = <?php echo $imessage ? (int)$imessage['count'] : 0; ?>;
+    var window_label = '<?php echo $imessage ? h($imessage['window_label']) : ''; ?>';
+    var label = 'Messages \u2014 ' + count + ' message' + (count !== 1 ? 's' : '') + ' overnight (' + window_label + ')';
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        btn.innerHTML = '&#9660; Messages';
         btn.className = 'expander expander-open';
     } else {
         el.style.display = 'none';

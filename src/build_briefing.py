@@ -20,6 +20,7 @@ from cluster_news import cluster_stories
 from fetch_geek_news import fetch_geek_news
 from fetch_xkcd import fetch_xkcd
 from fetch_unifi import fetch_unifi
+from fetch_imessage import fetch_imessage
 
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -94,6 +95,9 @@ def main():
     print('  Fetching Unifi security events...')
     unifi = fetch_unifi(config)
 
+    print('  Fetching iMessage overnight activity...')
+    imessage = fetch_imessage(config)
+
     briefing = {
         'generated_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
         'run_type': run_type,
@@ -110,6 +114,7 @@ def main():
         'hackernews': hackernews,
         'xkcd': xkcd,
         'unifi': unifi,
+        'imessage': imessage,
     }
 
     output_path = os.path.join(DATA_DIR, 'briefing.json')
