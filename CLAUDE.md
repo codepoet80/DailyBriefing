@@ -1,6 +1,6 @@
 # Daily Briefing
 
-A self-hosted morning dashboard that aggregates calendars, news, todos, HackerNews, XKCD, and a podcast into a single read-only web page. Built to run on macOS or Raspberry Pi, with a PHP frontend compatible with a 2011 webOS TouchPad.
+A self-hosted morning dashboard that aggregates calendars, news, todos, Geek News (HN + Slashdot), XKCD, and more into a single read-only web page. Built to run on macOS or Raspberry Pi, with a PHP frontend compatible with a 2011 webOS TouchPad.
 
 ## Architecture
 
@@ -39,15 +39,15 @@ src/
   fetch_calendars.py   # CalDAV/ics fetcher — supports ownCloud WebDAV and direct URLs
   fetch_news.py        # RSS feed fetcher (uses requests for timeout safety)
   cluster_news.py      # Story deduplication/importance module (swappable)
-  fetch_hackernews.py  # HN Firebase API, parallel fetch
+  fetch_geek_news.py   # HN Firebase API + Slashdot RSS, interleaved
   fetch_xkcd.py        # XKCD API with new-comic state tracking
   fetch_todos.py       # Runs `checkmate ls` and parses output
-  fetch_podcast.py     # Fetches latest episode MP3 from podcast RSS feed
   fetch_weather.py     # Open-Meteo API (no key needed), lat/lon from config
   fetch_servers.py     # Fetches status pages, parses btn-success/btn-danger Bootstrap classes
+  fetch_greeting.py    # Time-of-day greeting + ZenQuotes daily quote
+  fetch_unifi.py       # Unifi Protect overnight security event summary
 web/
   index.php            # PHP renderer, PHP 7.4 compatible
-  podcast.php          # Standalone audio player page (opened in new tab)
   style.css            # Old WebKit compatible (no Grid, no CSS vars)
   manifest.json        # PWA manifest for Android installability
   icon.png             # 512px source icon (generate resized icons with ImageMagick)
@@ -87,16 +87,22 @@ requirements.txt       # requests, icalendar, recurring_ical_events, feedparser
     "translation": "ESV",
     "esv_api_key": ""          // get free key at esv.org/api; blank = BibleGateway NIV
   },
-  "hackernews": { "top_count": 20 },
+  "geek_news": { "count": 20 },
   "news": {
     "importance_threshold": 2, // min sources for a story to be elevated
     "similarity_threshold": 0.65,
     "max_important": 15,
     "max_regular": 30
   },
-  "podcast": {
-    "name": "NPR Up First",
-    "feed_url": "https://feeds.npr.org/510318/podcast.xml"
+  "greeting": {
+    "name": "Jon"              // first name for time-of-day greeting
+  },
+  "unifi": {
+    "host": "https://192.168.x.x",
+    "username": "...",
+    "password": "...",
+    "night_start_hour": 22,    // overnight window start (default 10pm)
+    "night_end_hour": 6        // overnight window end (default 6am)
   },
   "todos": {
     "command": "checkmate ls", // any CLI that outputs "○ N. Title" lines
@@ -113,17 +119,18 @@ requirements.txt       # requests, icalendar, recurring_ical_events, feedparser
 Each feed entry:
 ```json
 {
-  "name": "Slashdot",
-  "url": "https://rss.slashdot.org/Slashdot/slashdotMain",
+  "name": "Example",
+  "url": "https://example.com/rss",
   "tier": "tech",
   "region": "global",
   "tech": true,
   "always_important": true,    // always elevated regardless of cross-source count
-  "verge_wired_pair": true     // elevated if 2+ feeds with this flag share a story
+  "verge_wired_pair": true,    // elevated if 2+ feeds with this flag share a story
+  "geek_only": true            // excluded from news sections; appears only in Geek News
 }
 ```
 
-Current feeds: BBC News, AP News (feedx.net), CBC News, Globe and Mail, The Guardian, Cleveland.com, NPR News, Slashdot (always_important), The Verge (verge_wired_pair), Wired (verge_wired_pair).
+Current feeds: BBC News, AP News (feedx.net), CBC News, Globe and Mail, The Guardian, Cleveland.com, NPR News, The Verge (verge_wired_pair), Wired (verge_wired_pair), Slashdot (geek_only).
 
 ## Calendar Notes
 
@@ -166,16 +173,26 @@ Uses [Open-Meteo](https://open-meteo.com/) — no API key required. Returns curr
 5. **Check Mate** — top N todos from `checkmate ls`
 6. **Top Stories** — cross-source clustered news, collapsible (expanded by default)
 7. **More News** — regular feed items, collapsible (collapsed by default)
-8. **Hacker News** — top N stories, collapsible (expanded by default)
+8. **Geek News** — HN + Slashdot interleaved, collapsible (collapsed by default)
 9. **Family This Week** — 7-day family calendars, grouped by day with "today" badge, color-coded per person
 10. **Tomorrow** — my calendars only, afternoon run only
 11. **XKCD** — only shown when a new comic is detected
-12. **NPR Up First** — dark banner with play button linking to `podcast.php` player
+
+## Geek News (`fetch_geek_news.py`)
+
+Combines HackerNews (Firebase API, parallel fetch) and Slashdot (RSS, `geek_only` flag in feeds.json) into a single section. Stories are interleaved by rank (HN #1, Slashdot #1, HN #2, …) up to `geek_news.count`. HN items show score and comment count; Slashdot items show a source tag only.
+
+## Greeting (`fetch_greeting.py`)
+
+Time-of-day salutation (Good morning/afternoon/evening) using the name from `greeting.name` in config. Daily inspirational quote from [ZenQuotes](https://zenquotes.io/) `/api/today` endpoint — same quote across all three runs.
+
+## Unifi Security (`fetch_unifi.py`)
+
+Fetches events from Unifi Protect's local REST API for a configurable overnight window (default 10pm–6am). Authenticates with username/password; requires `X-CSRF-Token` header on subsequent requests. Summarises smart detections (Person, Vehicle, etc.) and motion counts per camera. Section hidden if no overnight events.
 
 ## Known Issues / Future Ideas
 
-- Reuters RSS is dead (discontinued 2020) — already replaced with The Guardian
 - ESV API key needed for ESV translation; blank key falls back to BibleGateway (NIV)
-- story clustering module is intentionally swappable — could add LLM summarization
+- Story clustering module is intentionally swappable — could add LLM summarization
 - InoReader API integration planned (currently using raw RSS feeds)
-- No auth needed — LAN-only deployment
+- Unifi Protect API is unofficial — may break on firmware updates

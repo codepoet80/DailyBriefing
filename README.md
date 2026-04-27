@@ -17,7 +17,6 @@ Runs on macOS or Raspberry Pi. Frontend is compatible with a 2011 webOS TouchPad
 - Family calendar — full week, grouped by day
 - Tomorrow preview (afternoon run only)
 - XKCD (when a new comic is out)
-- NPR Up First podcast player
 
 ## Setup
 
