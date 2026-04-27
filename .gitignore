@@ -1,3 +1,4 @@
+.DS_Store
 # Live config with credentials — use config.json.example as the template
 config/config.json
 
