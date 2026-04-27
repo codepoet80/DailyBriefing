@@ -227,13 +227,16 @@ $regular_count = count($news_regular);
 
 <?php if (!empty($hackernews)): ?>
 <div class="section section-hn">
-    <div id="hn-toggle" class="expander" onclick="toggleHN()">&#9658; Hacker News (<?php echo count($hackernews); ?>)</div>
+    <div id="hn-toggle" class="expander" onclick="toggleHN()">&#9658; Geek News (<?php echo count($hackernews); ?>)</div>
     <div id="hn-list" style="display:none">
     <ol class="hn-list">
         <?php foreach ($hackernews as $item): ?>
         <li>
             <a href="<?php echo h($item['url']); ?>" target="_blank"><?php echo h($item['title']); ?></a>
+            <?php if ($item['source'] === 'HN' && $item['score'] !== null): ?>
             <span class="hn-meta"><?php echo h($item['score']); ?> pts &middot; <?php echo h($item['comments']); ?> comments</span>
+            <?php endif; ?>
+            <span class="source-tag"><?php echo h($item['source']); ?></span>
         </li>
         <?php endforeach; ?>
     </ol>
@@ -348,11 +351,11 @@ function toggleHN() {
     var count = <?php echo (int)count($hackernews); ?>;
     if (el.style.display === 'none') {
         el.style.display = 'block';
-        btn.innerHTML = '&#9660; Hacker News (' + count + ')';
+        btn.innerHTML = '&#9660; Geek News (' + count + ')';
         btn.className = 'expander expander-open';
     } else {
         el.style.display = 'none';
-        btn.innerHTML = '&#9658; Hacker News (' + count + ')';
+        btn.innerHTML = '&#9658; Geek News (' + count + ')';
         btn.className = 'expander';
     }
 }

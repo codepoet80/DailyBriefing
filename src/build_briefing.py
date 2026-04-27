@@ -18,7 +18,7 @@ from fetch_weather import fetch_weather
 from fetch_servers import fetch_servers
 from fetch_news import fetch_news
 from cluster_news import cluster_stories
-from fetch_hackernews import fetch_hackernews
+from fetch_geek_news import fetch_geek_news
 from fetch_xkcd import fetch_xkcd
 from fetch_unifi import fetch_unifi
 
@@ -89,8 +89,8 @@ def main():
     news_important = news_important[:news_cfg.get('max_important', 8)]
     news_regular = news_regular[:news_cfg.get('max_regular', 20)]
 
-    print('  Fetching HackerNews...')
-    hackernews = fetch_hackernews(config.get('hackernews', {}).get('top_count', 25))
+    print('  Fetching Geek News (HN + Slashdot)...')
+    hackernews = fetch_geek_news(config, feeds)
 
     print('  Fetching XKCD...')
     xkcd = fetch_xkcd(DATA_DIR)

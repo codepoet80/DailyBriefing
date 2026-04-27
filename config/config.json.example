@@ -46,8 +46,8 @@
     "max_important": 8,
     "max_regular": 20
   },
-  "hackernews": {
-    "top_count": 25
+  "geek_news": {
+    "count": 20
   },
   "podcast": {
     "name": "NPR Up First",

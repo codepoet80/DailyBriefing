@@ -54,7 +54,7 @@
     "tier": "tech",
     "region": "global",
     "tech": true,
-    "always_important": true
+    "geek_only": true
   },
   {
     "name": "The Verge",

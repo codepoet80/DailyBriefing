@@ -9,6 +9,8 @@ FEED_TIMEOUT = 15
 def fetch_news(feeds_config):
     stories = []
     for feed in feeds_config:
+        if feed.get('geek_only'):
+            continue
         try:
             print('    ' + feed['name'] + ' <- ' + feed['url'])
             resp = requests.get(feed['url'], timeout=FEED_TIMEOUT,
