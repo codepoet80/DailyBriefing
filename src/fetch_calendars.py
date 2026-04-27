@@ -103,6 +103,11 @@ def _parse_event(event, calendar_name, color=''):
     summary = str(event.get('SUMMARY', '(No title)'))
     loc = event.get('LOCATION')
     location = str(loc) if loc else None
+    if location:
+        if 'teams.microsoft.com' in location:
+            location = 'Microsoft Teams Meeting'
+        elif 'zoom.us' in location:
+            location = 'Zoom Meeting'
 
     return {
         'time': time_str,
