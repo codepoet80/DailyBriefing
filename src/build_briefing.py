@@ -42,13 +42,15 @@ def determine_run_type():
         return 'morning'
     elif hour < 14:
         return 'midday'
-    return 'afternoon'
+    elif hour < 19:
+        return 'afternoon'
+    return 'evening'
 
 
 def main():
     config, feeds = load_config()
     run_type = determine_run_type()
-    include_tomorrow = (run_type == 'afternoon')
+    include_tomorrow = run_type in ('afternoon', 'evening')
 
     print('Building briefing (' + run_type + ')...')
 
@@ -92,7 +94,7 @@ def main():
     print('  Fetching XKCD...')
     xkcd = fetch_xkcd(DATA_DIR)
 
-    if run_type != 'afternoon':
+    if run_type in ('morning', 'midday'):
         print('  Fetching Unifi security events...')
         unifi = fetch_unifi(config)
         print('  Fetching iMessage overnight activity...')
@@ -108,14 +110,14 @@ def main():
         'verse': verse,
         'servers': servers,
         'weather': weather,
-        'my_calendar': my_calendar,
+        'my_calendar': my_calendar if run_type != 'evening' else [],
         'todos': todos,
         'family_calendar': family_calendar,
         'tomorrow_preview': tomorrow_preview if include_tomorrow else [],
         'news_important': news_important,
-        'news_regular': news_regular,
+        'news_regular': news_regular if run_type != 'evening' else [],
         'hackernews': hackernews,
-        'xkcd': xkcd,
+        'xkcd': xkcd if run_type != 'evening' else None,
         'unifi': unifi,
         'imessage': imessage,
     }

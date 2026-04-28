@@ -180,6 +180,7 @@ $regular_count = count($news_regular);
 </div>
 <?php endif; ?>
 
+<?php if ($run_type !== 'evening'): ?>
 <div class="section">
     <h2>Today &mdash; <?php echo h($today_label); ?></h2>
     <?php if (empty($my_calendar)): ?>
@@ -200,6 +201,7 @@ $regular_count = count($news_regular);
     </ol>
     <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <?php if (!empty($todos)): ?>
 <div class="section section-todos">

@@ -13,8 +13,9 @@ A self-hosted morning dashboard that aggregates calendars, news, todos, Geek New
 30 6  * * * /path/to/daily-briefing/run.sh
 30 11 * * * /path/to/daily-briefing/run.sh
 30 16 * * * /path/to/daily-briefing/run.sh
+30 19 * * * /path/to/daily-briefing/run.sh
 ```
-The afternoon run (16:30) also includes tomorrow's calendar preview.
+The afternoon run (16:30) and evening run (19:30) both include tomorrow's calendar preview. The evening run omits today's schedule, More News, and XKCD.
 
 ### Dev server
 ```bash
