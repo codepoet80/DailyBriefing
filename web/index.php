@@ -349,7 +349,7 @@ function toggleNews() {
 function toggleWeather() {
     var el  = document.getElementById('wx-detail');
     var btn = document.getElementById('wx-toggle');
-    var summary = 'Weather \u2014 <?php echo h($today_wx['temp'] . ', ' . $today_wx['condition']); ?>';
+    var summary = 'Weather \u2014 <?php echo isset($today_wx) ? h($today_wx['temp'] . ', ' . $today_wx['condition']) : ''; ?>';
     if (el.style.display === 'none') {
         el.style.display = 'block';
         btn.innerHTML = '&#9660; Weather';
