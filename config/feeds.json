@@ -14,6 +14,13 @@
     "tech": false
   },
   {
+    "name": "Washington Post",
+    "url": "https://feeds.washingtonpost.com/rss/world",
+    "tier": "international",
+    "region": "us",
+    "tech": false
+  },
+  {
     "name": "CBC News",
     "url": "https://www.cbc.ca/cmlink/rss-topstories",
     "tier": "national",
