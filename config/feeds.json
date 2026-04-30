@@ -1,7 +1,7 @@
 [
   {
     "name": "BBC News",
-    "url": "https://feeds.bbci.co.uk/news/rss.xml",
+    "url": "https://morss.it/https://feeds.bbci.co.uk/news/world/rss.xml",
     "tier": "international",
     "region": "global",
     "tech": false
@@ -42,8 +42,8 @@
     "tech": false
   },
   {
-    "name": "Cleveland.com",
-    "url": "https://www.cleveland.com/arc/outboundfeeds/rss/",
+    "name": "Cleveland Fox 8",
+    "url": "https://fox8.com/feed/",
     "tier": "local",
     "region": "us-ohio",
     "tech": false
