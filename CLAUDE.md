@@ -93,7 +93,8 @@ requirements.txt       # requests, icalendar, recurring_ical_events, feedparser
     "importance_threshold": 2, // min sources for a story to be elevated
     "similarity_threshold": 0.65,
     "max_important": 15,
-    "max_regular": 30
+    "max_regular": 30,
+    "title_filters": ["coupon"]  // case-insensitive substrings; matching titles excluded before counting
   },
   "greeting": {
     "name": "Jon"              // first name for time-of-day greeting

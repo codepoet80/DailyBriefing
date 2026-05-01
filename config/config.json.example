@@ -44,7 +44,8 @@
     "importance_threshold": 2,
     "similarity_threshold": 0.65,
     "max_important": 8,
-    "max_regular": 20
+    "max_regular": 20,
+    "title_filters": ["coupon", "promo code", "deal of the day"]
   },
   "geek_news": {
     "count": 20

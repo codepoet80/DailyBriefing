@@ -78,8 +78,16 @@ def main():
 
     print('  Fetching news feeds (' + str(len(feeds)) + ' configured)...')
     raw_stories = fetch_news(feeds)
-    print('  Clustering ' + str(len(raw_stories)) + ' raw stories...')
     news_cfg = config.get('news', {})
+    title_filters = [w.lower() for w in news_cfg.get('title_filters', [])]
+    if title_filters:
+        before = len(raw_stories)
+        raw_stories = [
+            s for s in raw_stories
+            if not any(f in s['title'].lower() for f in title_filters)
+        ]
+        print('  Filtered ' + str(before - len(raw_stories)) + ' stories by title_filters')
+    print('  Clustering ' + str(len(raw_stories)) + ' raw stories...')
     news_important, news_regular = cluster_stories(
         raw_stories,
         threshold=news_cfg.get('similarity_threshold', 0.65),
