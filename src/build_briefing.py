@@ -49,8 +49,10 @@ def determine_run_type():
 
 def main():
     config, feeds = load_config()
+    now = datetime.now()
     run_type = determine_run_type()
-    include_tomorrow = run_type in ('afternoon', 'evening')
+    sunday_afternoon = (now.weekday() == 6 and now.hour >= 10)
+    include_tomorrow = run_type in ('afternoon', 'evening') or sunday_afternoon
 
     print('Building briefing (' + run_type + ')...')
 
