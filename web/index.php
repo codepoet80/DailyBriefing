@@ -39,6 +39,7 @@ $generated_at    = isset($briefing['generated_at'])    ? $briefing['generated_at
 $run_type        = isset($briefing['run_type'])        ? $briefing['run_type']        : '';
 $unifi           = isset($briefing['unifi'])           ? $briefing['unifi']           : null;
 $imessage        = isset($briefing['imessage'])        ? $briefing['imessage']        : null;
+$github          = isset($briefing['github'])          ? $briefing['github']          : array();
 
 $today_label   = date('l, F j, Y');
 $tomorrow_label = date('l, F j', strtotime('+1 day'));
@@ -211,6 +212,24 @@ $regular_count = count($news_regular);
         <li><?php echo h($todo['title']); ?></li>
         <?php endforeach; ?>
     </ol>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($github)): ?>
+<div class="section section-github">
+    <div id="github-toggle" class="expander expander-open" onclick="toggleGithub()">&#9660; GitHub (<?php echo count($github); ?>)</div>
+    <div id="github-list">
+        <ul class="news-list">
+        <?php foreach ($github as $n): ?>
+        <li>
+            <span class="gh-type"><?php echo h($n['type']); ?></span>
+            <a href="<?php echo h($n['url']); ?>" target="_blank"><?php echo h($n['title']); ?></a>
+            <span class="source-tag"><?php echo h($n['repo']); ?></span>
+            <span class="gh-reason"><?php echo h($n['reason']); ?></span>
+        </li>
+        <?php endforeach; ?>
+        </ul>
+    </div>
 </div>
 <?php endif; ?>
 
@@ -406,6 +425,21 @@ function toggleImessage() {
     } else {
         el.style.display = 'none';
         btn.innerHTML = '&#9658; ' + label;
+        btn.className = 'expander';
+    }
+}
+
+function toggleGithub() {
+    var el  = document.getElementById('github-list');
+    var btn = document.getElementById('github-toggle');
+    var count = <?php echo (int)count($github); ?>;
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        btn.innerHTML = '&#9660; GitHub (' + count + ')';
+        btn.className = 'expander expander-open';
+    } else {
+        el.style.display = 'none';
+        btn.innerHTML = '&#9658; GitHub (' + count + ')';
         btn.className = 'expander';
     }
 }

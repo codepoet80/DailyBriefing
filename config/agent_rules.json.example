@@ -1,0 +1,68 @@
+{
+  "rules": [
+    {
+      "id": "calendar_upcoming",
+      "type": "calendar",
+      "enabled": true,
+      "window_minutes": 90,
+      "keywords": [],
+      "pushover_priority": 0,
+      "dedupe_hours": 8
+    },
+    {
+      "id": "family_calendar_today",
+      "type": "family_calendar",
+      "enabled": true,
+      "pushover_priority": -1,
+      "dedupe_hours": 24
+    },
+    {
+      "id": "server_down",
+      "type": "server_status",
+      "enabled": true,
+      "pushover_priority": 1,
+      "dedupe_hours": 1
+    },
+    {
+      "id": "security_overnight",
+      "type": "security",
+      "enabled": true,
+      "pushover_priority": 0,
+      "dedupe_hours": 24
+    },
+    {
+      "id": "news_keywords",
+      "type": "news_keyword",
+      "enabled": false,
+      "keywords": ["example topic"],
+      "pushover_priority": -1,
+      "dedupe_hours": 24
+    },
+    {
+      "id": "todos_morning",
+      "type": "todos",
+      "enabled": true,
+      "hour": 9,
+      "keywords": ["!"],
+      "max_count": 3,
+      "pushover_priority": -1,
+      "dedupe_hours": 24
+    },
+    {
+      "id": "github_notifications",
+      "type": "github",
+      "enabled": true,
+      "reasons": ["mention", "review_requested", "assign", "team_mention", "security_alert", "author", "invitation", "state_change"],
+      "pushover_priority": 0,
+      "dedupe_hours": 4
+    },
+    {
+      "id": "weather_alert",
+      "type": "weather",
+      "enabled": true,
+      "conditions": ["rain", "snow", "storm", "severe", "thunderstorm"],
+      "pushover_priority": 0,
+      "dedupe_hours": 12
+    }
+  ]
+}

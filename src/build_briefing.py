@@ -21,6 +21,7 @@ from fetch_geek_news import fetch_geek_news
 from fetch_xkcd import fetch_xkcd
 from fetch_unifi import fetch_unifi
 from fetch_imessage import fetch_imessage
+from fetch_github import fetch_github
 
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -113,6 +114,9 @@ def main():
         unifi = None
         imessage = None
 
+    print('  Fetching GitHub notifications...')
+    github = fetch_github(config)
+
     briefing = {
         'generated_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
         'run_type': run_type,
@@ -130,6 +134,7 @@ def main():
         'xkcd': xkcd if run_type != 'evening' else None,
         'unifi': unifi,
         'imessage': imessage,
+        'github': github,
     }
 
     output_path = os.path.join(DATA_DIR, 'briefing.json')

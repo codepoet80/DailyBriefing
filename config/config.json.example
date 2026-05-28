@@ -66,5 +66,22 @@
     "night_start_hour": 22,
     "night_end_hour": 6,
     "night_end_minute": 30
+  },
+  "todos": {
+    "command": "checkmate ls",
+    "add_command": "checkmate add",
+    "count": 8
+  },
+  "github": {
+    "token": "ghp_...",
+    "max_count": 30
+  },
+  "agent": {
+    "enabled": false,
+    "anthropic_api_key": "sk-ant-...",
+    "model": "claude-haiku-4-5-20251001",
+    "pushover_app_token": "YOUR_PUSHOVER_APP_TOKEN",
+    "pushover_user_key": "YOUR_PUSHOVER_USER_KEY",
+    "pushover_device": ""
   }
 }
