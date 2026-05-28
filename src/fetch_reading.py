@@ -32,6 +32,7 @@ def fetch_reading(config):
         title = data.get('title', '').strip()
         author = data.get('author', '').strip()
         ts_ms = data.get('timestamp', 0)
+        position = data.get('position', 0)
 
         if not title or not ts_ms:
             continue
@@ -59,6 +60,7 @@ def fetch_reading(config):
             'last_read_label': last_read_label,
             'days_since': days_since,
             'stagnant': days_since >= stagnant_days,
+            'percent': round(position / 100),
         })
 
     books.sort(key=lambda b: b['days_since'])

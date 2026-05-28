@@ -224,6 +224,9 @@ $regular_count = count($news_regular);
         <li<?php if ($book['stagnant']): ?> class="reading-stagnant"<?php endif; ?>>
             <span class="reading-title"><?php echo h($book['title']); ?></span>
             <span class="reading-author">by <?php echo h($book['author']); ?></span>
+            <?php if (isset($book['percent']) && $book['percent'] > 0): ?>
+            <span class="reading-percent"><?php echo (int)$book['percent']; ?>%</span>
+            <?php endif; ?>
             <span class="reading-last-read"><?php echo h($book['last_read_label']); ?></span>
         </li>
     <?php endforeach; ?>

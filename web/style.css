@@ -553,6 +553,13 @@ h2 {
     font-weight: bold;
 }
 
+.reading-percent {
+    float: right;
+    font-size: 12px;
+    color: #4a90d9;
+    margin-right: 10px;
+}
+
 /* ---- GitHub ---- */
 .gh-type {
     font-size: 10px;
