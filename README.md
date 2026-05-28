@@ -1,6 +1,6 @@
 # Daily Briefing
 
-A self-hosted morning dashboard. A Python cron script fetches data from a dozen sources and writes `data/briefing.json`; a PHP page renders it as a clean, read-only daily briefing.
+A self-hosted morning dashboard and personal push agent. A Python cron script fetches data from a dozen sources, writes `data/briefing.json`, and optionally pushes smart notifications via Pushover. A PHP page renders the JSON as a clean, read-only daily briefing.
 
 Runs on macOS or Raspberry Pi. Frontend is compatible with a 2011 webOS TouchPad (WebKit 534, ES5 only, no CSS Grid).
 
@@ -11,6 +11,7 @@ Runs on macOS or Raspberry Pi. Frontend is compatible with a 2011 webOS TouchPad
 - Weather — current + 5-day forecast
 - Today's calendar events
 - Todo list (from `checkmate`)
+- GitHub notifications (unread, with type + reason)
 - Top news stories (cross-source clustered)
 - More news (collapsible)
 - Geek News — HackerNews + Slashdot combined
@@ -38,18 +39,82 @@ Add to crontab for automatic updates:
 30 16 * * * /path/to/daily-briefing/run.sh
 ```
 
+## Push agent (Pushover notifications)
+
+After each briefing build, `run_agent.py` evaluates configured rules against the fresh data and sends Pushover notifications for anything new and matched.
+
+```bash
+cp config/agent_rules.json.example config/agent_rules.json
+# edit agent_rules.json to configure rules
+```
+
+Add to `config/config.json`:
+```json
+"agent": {
+  "enabled": true,
+  "anthropic_api_key": "sk-ant-...",
+  "model": "claude-haiku-4-5-20251001",
+  "pushover_app_token": "YOUR_APP_TOKEN",
+  "pushover_user_key": "YOUR_USER_KEY",
+  "pushover_device": ""
+}
+```
+
+### Rule types
+
+| Type | Triggers when |
+|------|--------------|
+| `calendar` | A calendar event title matches `keywords` and starts within `window_minutes` |
+| `family_calendar` | Any family calendar event falls on today |
+| `server_status` | One or more monitored servers is down |
+| `security` | Unifi Protect detected overnight events |
+| `github` | Unread GitHub notifications match the `reasons` list |
+| `news_keyword` | A news story title contains one of the `keywords` |
+| `todos` | Open todos match `keywords` (e.g. `"!"`) at the configured `hour` |
+| `weather` | Today's condition contains one of the `conditions` strings |
+
+Each rule has `dedupe_hours` — the same match won't re-notify within that window. For `github`, dedup is also keyed on `updated_at`, so a notification only re-fires when there's new activity on the thread.
+
+## Claude Code / MCP server
+
+`src/mcp_server.py` exposes the briefing as an MCP resource so any Claude Code session has your full daily context automatically.
+
+Install Claude Code, then add to `~/.claude/settings.json`:
+```json
+{
+  "mcpServers": {
+    "daily-briefing": {
+      "command": "/path/to/DailyBriefing/.venv/bin/python3",
+      "args": ["/path/to/DailyBriefing/src/mcp_server.py"]
+    }
+  }
+}
+```
+
+Available resources and tools:
+
+| Name | Type | Description |
+|------|------|-------------|
+| `briefing://current` | resource | Full briefing.json — calendar, todos, news, weather, GitHub |
+| `briefing://memory` | resource | Agent push history and rule stats |
+| `add_todo` | tool | Add a todo via `checkmate add` |
+| `send_notification` | tool | Send a Pushover notification |
+| `refresh_briefing` | tool | Rebuild briefing.json on demand |
+
+For remote access (phone, another machine), run `claude --tunnel` on the host — it gives you a URL that connects to your local Claude Code session with MCP context attached.
+
 ## News feeds (`config/feeds.json`)
 
 Each entry is an RSS feed. Optional flags control how stories are elevated to Top Stories:
 
 | Flag | Effect |
 |------|--------|
-| `"always_important": true` | Every story from this feed is elevated to Top Stories regardless of cross-source matching |
+| `"always_important": true` | Every story from this feed is elevated to Top Stories |
 | `"verge_wired_pair": true` | Elevated if 2+ feeds sharing this flag cover the same story |
-| `"geek_only": true` | Excluded from Top Stories / More News; appears only in the Geek News section |
+| `"geek_only": true` | Appears only in Geek News, not Top Stories or More News |
 
 Cross-source matching is controlled in `config.json`:
-- `similarity_threshold` — how closely two headlines must match to count as the same story (default `0.65`, lower = broader net)
+- `similarity_threshold` — how closely two headlines must match (default `0.65`)
 - `importance_threshold` — how many sources must cover a story to elevate it (default `2`)
 
 ## Requirements
