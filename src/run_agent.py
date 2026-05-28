@@ -140,6 +140,23 @@ def evaluate_rules(briefing, rules):
                     'summary': f"{len(open_todos)} open todos; top: {top[0]['title']}",
                 })
 
+        elif rule_type == 'reading':
+            reading = briefing.get('reading') or {}
+            stagnant = reading.get('stagnant', [])
+            if stagnant:
+                today_str = now.strftime('%Y-%m-%d')
+                titles = [b['title'] for b in stagnant]
+                longest_gap = stagnant[-1]['days_since']
+                candidates.append({
+                    'rule': rule,
+                    'item_key': f'reading:stagnant:{today_str}',
+                    'data': {'stagnant': stagnant},
+                    'summary': (
+                        f"{len(stagnant)} book(s) unread for {longest_gap}+ days: "
+                        + ', '.join(titles)
+                    ),
+                })
+
         elif rule_type == 'github':
             notifications = briefing.get('github') or []
             reasons = rule.get('reasons', [])

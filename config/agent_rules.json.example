@@ -39,6 +39,13 @@
       "dedupe_hours": 24
     },
     {
+      "id": "reading_reminder",
+      "type": "reading",
+      "enabled": true,
+      "pushover_priority": -1,
+      "dedupe_hours": 24
+    },
+    {
       "id": "todos_morning",
       "type": "todos",
       "enabled": true,

@@ -22,6 +22,7 @@ from fetch_xkcd import fetch_xkcd
 from fetch_unifi import fetch_unifi
 from fetch_imessage import fetch_imessage
 from fetch_github import fetch_github
+from fetch_reading import fetch_reading
 
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -117,6 +118,9 @@ def main():
     print('  Fetching GitHub notifications...')
     github = fetch_github(config)
 
+    print('  Fetching reading progress...')
+    reading = fetch_reading(config)
+
     briefing = {
         'generated_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
         'run_type': run_type,
@@ -135,6 +139,7 @@ def main():
         'unifi': unifi,
         'imessage': imessage,
         'github': github,
+        'reading': reading,
     }
 
     output_path = os.path.join(DATA_DIR, 'briefing.json')

@@ -40,6 +40,7 @@ $run_type        = isset($briefing['run_type'])        ? $briefing['run_type']  
 $unifi           = isset($briefing['unifi'])           ? $briefing['unifi']           : null;
 $imessage        = isset($briefing['imessage'])        ? $briefing['imessage']        : null;
 $github          = isset($briefing['github'])          ? $briefing['github']          : array();
+$reading         = isset($briefing['reading'])         ? $briefing['reading']         : null;
 
 $today_label   = date('l, F j, Y');
 $tomorrow_label = date('l, F j', strtotime('+1 day'));
@@ -212,6 +213,21 @@ $regular_count = count($news_regular);
         <li><?php echo h($todo['title']); ?></li>
         <?php endforeach; ?>
     </ol>
+</div>
+<?php endif; ?>
+
+<?php if ($reading && !empty($reading['books'])): ?>
+<div class="section section-reading">
+    <h2>Currently Reading</h2>
+    <ul class="reading-list">
+    <?php foreach ($reading['books'] as $book): ?>
+        <li<?php if ($book['stagnant']): ?> class="reading-stagnant"<?php endif; ?>>
+            <span class="reading-title"><?php echo h($book['title']); ?></span>
+            <span class="reading-author">by <?php echo h($book['author']); ?></span>
+            <span class="reading-last-read"><?php echo h($book['last_read_label']); ?></span>
+        </li>
+    <?php endforeach; ?>
+    </ul>
 </div>
 <?php endif; ?>
 
