@@ -64,9 +64,9 @@
     "night_end_minute": 30
   },
   "todos": {
-    "command": "checkmate ls",
-    "add_command": "checkmate add",
-    "count": 8
+    "command": "${HOME}/Projects/library/macos/checkmate.py ls",
+    "add_command": "${HOME}/Projects/library/macos/checkmate.py add",
+    "count": 8  
   },
   "reading": {
     "papyrus_dir": "~/ownCloud/Dropbox/.papyrus",
