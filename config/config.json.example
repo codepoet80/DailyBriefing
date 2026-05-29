@@ -36,10 +36,6 @@
   "calendar_filters": {
     "exclude_titles": ["Morning Routine"]
   },
-  "todos": {
-    "command": "checkmate ls",
-    "count": 8
-  },
   "news": {
     "importance_threshold": 2,
     "similarity_threshold": 0.65,
