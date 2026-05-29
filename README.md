@@ -28,6 +28,13 @@ cp config/config.json.example config/config.json
 cp config/feeds.json.example config/feeds.json
 # edit feeds.json if you want different news sources
 
+cp config/agent_rules.json.example config/agent_rules.json
+# edit agent_rules.json if you want different notification rules
+
+cp mcp.json .mcp.json
+# edit .mcp.json with the path to this project
+
+
 ./run.sh                        # first run — creates .venv and builds briefing.json
 php -S 0.0.0.0:8181 -t web/    # dev server
 ```
