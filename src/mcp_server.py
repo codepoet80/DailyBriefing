@@ -329,8 +329,9 @@ async def call_tool(name: str, arguments: dict):
                 dtend = dtstart + timedelta(hours=1)
 
         # Find writable calendar
-        all_mine = config.get('calendars', {}).get('mine', [])
-        writable = [c for c in all_mine if c.get('writable')]
+        all_cals = (config.get('calendars', {}).get('mine', []) +
+                    config.get('calendars', {}).get('family', []))
+        writable = [c for c in all_cals if c.get('writable')]
         if not writable:
             return [types.TextContent(type='text', text='No writable calendars configured. Add "writable": true to a calendar entry in config.json.')]
         if cal_name:
