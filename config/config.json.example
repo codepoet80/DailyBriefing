@@ -21,11 +21,17 @@
     "mine": [
       {
         "name": "Work",
-        "url": "/remote.php/dav/calendars/your_username/calendar-name/?export"
+        "url": "/remote.php/dav/calendars/your_username/calendar-name/?export",
+        "writable": true
       },
       {
         "name": "Personal",
-        "url": "https://calendar.zoho.com/ical/your-private-token-here"
+        "url": "https://calendar.zoho.com/ical/your-private-token-here",
+        "writable": true,
+        "default": true,
+        "caldav_write_url": "https://caldav.zoho.com/v2/your_account_id/events/your_calendar_uid/",
+        "caldav_username": "user@zoho.com",
+        "caldav_password": "your-zoho-app-password"
       }
     ],
     "family": [

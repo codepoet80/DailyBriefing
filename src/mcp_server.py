@@ -123,6 +123,39 @@ async def list_tools():
             inputSchema={'type': 'object', 'properties': {}},
         ),
         types.Tool(
+            name='add_calendar_event',
+            description=(
+                'Add an event to a writable CalDAV calendar. '
+                'Omit start_time for an all-day event. '
+                'calendar defaults to the first writable calendar in config.'
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'title': {'type': 'string', 'description': 'Event title'},
+                    'date': {
+                        'type': 'string',
+                        'description': 'Date: "today", "tomorrow", or ISO date "YYYY-MM-DD"',
+                    },
+                    'start_time': {
+                        'type': 'string',
+                        'description': 'Start time, e.g. "14:00" or "2:00 PM". Omit for all-day.',
+                    },
+                    'end_time': {
+                        'type': 'string',
+                        'description': 'End time, e.g. "15:00" or "3:00 PM". Defaults to 1 hour after start.',
+                    },
+                    'location': {'type': 'string', 'description': 'Optional location'},
+                    'notes': {'type': 'string', 'description': 'Optional description / notes'},
+                    'calendar': {
+                        'type': 'string',
+                        'description': 'Calendar name to write to (must have writable:true in config)',
+                    },
+                },
+                'required': ['title', 'date'],
+            },
+        ),
+        types.Tool(
             name='send_message',
             description=(
                 'Send an iMessage/SMS via the local message bridge. '
@@ -229,6 +262,145 @@ async def call_tool(name: str, arguments: dict):
             return [types.TextContent(type='text', text='Error: timed out after 120s')]
         except Exception as e:
             return [types.TextContent(type='text', text=f'Error: {e}')]
+
+    if name == 'add_calendar_event':
+        import uuid
+        import icalendar
+        from datetime import date as date_type, datetime as datetime_type, timedelta
+
+        def _parse_date(s):
+            s = s.strip().lower()
+            today = date_type.today()
+            if s == 'today':
+                return today
+            if s == 'tomorrow':
+                return today + timedelta(days=1)
+            return date_type.fromisoformat(s)
+
+        def _parse_time(s):
+            s = s.strip().upper().replace('.', '')
+            ampm = None
+            if s.endswith('AM') or s.endswith('PM'):
+                ampm = s[-2:]
+                s = s[:-2].strip()
+            parts = s.split(':')
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+            if ampm == 'PM' and hour != 12:
+                hour += 12
+            elif ampm == 'AM' and hour == 12:
+                hour = 0
+            return hour, minute
+
+        title = arguments.get('title', '').strip()
+        date_str = arguments.get('date', '').strip()
+        start_time_str = arguments.get('start_time', '')
+        end_time_str = arguments.get('end_time', '')
+        location = arguments.get('location', '').strip()
+        notes = arguments.get('notes', '').strip()
+        cal_name = arguments.get('calendar', '').strip()
+
+        if not title or not date_str:
+            return [types.TextContent(type='text', text='Error: title and date are required')]
+
+        try:
+            event_date = _parse_date(date_str)
+        except ValueError:
+            return [types.TextContent(type='text', text=f'Error: could not parse date "{date_str}"')]
+
+        # Build dtstart / dtend
+        all_day = not start_time_str
+        if all_day:
+            dtstart = event_date
+            dtend = event_date + timedelta(days=1)
+        else:
+            try:
+                sh, sm = _parse_time(start_time_str)
+            except (ValueError, IndexError):
+                return [types.TextContent(type='text', text=f'Error: could not parse start_time "{start_time_str}"')]
+            dtstart = datetime_type(event_date.year, event_date.month, event_date.day, sh, sm)
+            if end_time_str:
+                try:
+                    eh, em = _parse_time(end_time_str)
+                except (ValueError, IndexError):
+                    return [types.TextContent(type='text', text=f'Error: could not parse end_time "{end_time_str}"')]
+                dtend = datetime_type(event_date.year, event_date.month, event_date.day, eh, em)
+            else:
+                dtend = dtstart + timedelta(hours=1)
+
+        # Find writable calendar
+        all_mine = config.get('calendars', {}).get('mine', [])
+        writable = [c for c in all_mine if c.get('writable')]
+        if not writable:
+            return [types.TextContent(type='text', text='No writable calendars configured. Add "writable": true to a calendar entry in config.json.')]
+        if cal_name:
+            target = next((c for c in writable if c['name'].lower() == cal_name.lower()), None)
+            if not target:
+                names = ', '.join(c['name'] for c in writable)
+                return [types.TextContent(type='text', text=f'Calendar "{cal_name}" not found or not writable. Writable: {names}')]
+        else:
+            target = next((c for c in writable if c.get('default')), writable[0])
+
+        # Resolve CalDAV write URL and auth
+        url = target.get('caldav_write_url') or target.get('url', '')
+        # Strip ?export suffix to get the CalDAV collection URL
+        if '?' in url:
+            url = url[:url.index('?')]
+        if not url.endswith('/'):
+            url += '/'
+
+        owncloud_cfg = config.get('owncloud', {})
+        if url.startswith('http://') or url.startswith('https://'):
+            cdav_user = target.get('caldav_username', '')
+            cdav_pass = target.get('caldav_password', '')
+            auth = (cdav_user, cdav_pass) if cdav_user else None
+            ssl_verify = True
+            full_url = url
+        else:
+            base = owncloud_cfg.get('base_url', '').rstrip('/')
+            auth = (owncloud_cfg['username'], owncloud_cfg['password'])
+            ssl_verify = owncloud_cfg.get('ssl_verify', True)
+            full_url = base + url
+
+        # Build iCalendar payload
+        uid = str(uuid.uuid4()) + '@daily-briefing'
+        cal_obj = icalendar.Calendar()
+        cal_obj.add('prodid', '-//Daily Briefing MCP//EN')
+        cal_obj.add('version', '2.0')
+        ev = icalendar.Event()
+        ev.add('uid', uid)
+        ev.add('summary', title)
+        ev.add('dtstart', dtstart)
+        ev.add('dtend', dtend)
+        ev.add('dtstamp', datetime_type.utcnow())
+        if location:
+            ev.add('location', location)
+        if notes:
+            ev.add('description', notes)
+        cal_obj.add_component(ev)
+        ics_bytes = cal_obj.to_ical()
+
+        put_url = full_url + uid + '.ics'
+        try:
+            r = req.put(
+                put_url, data=ics_bytes, auth=auth, verify=ssl_verify,
+                headers={'Content-Type': 'text/calendar; charset=utf-8'},
+                timeout=15,
+            )
+            r.raise_for_status()
+        except req.exceptions.HTTPError:
+            return [types.TextContent(type='text', text=f'CalDAV error: HTTP {r.status_code}')]
+        except req.exceptions.RequestException as e:
+            return [types.TextContent(type='text', text=f'Error reaching CalDAV server: {e}')]
+
+        date_label = event_date.strftime('%A, %B %-d')
+        if all_day:
+            time_label = 'all day'
+        else:
+            time_label = dtstart.strftime('%-I:%M %p')
+            if end_time_str:
+                time_label += '–' + dtend.strftime('%-I:%M %p')
+        return [types.TextContent(type='text', text=f'Added "{title}" to {target["name"]} on {date_label} ({time_label})')]
 
     if name == 'send_message':
         from datetime import datetime, timedelta
