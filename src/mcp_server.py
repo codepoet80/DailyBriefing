@@ -31,9 +31,9 @@ async def _send_after_delay(delay_seconds: float, bridge_url: str, address: str,
         payload = {'address': address, 'isReply': is_reply, 'service': service, 'message': message}
         r = req.post(bridge_url + '/chats', json=payload, timeout=10)
         r.raise_for_status()
-        print(f'[send_message] Sent to {display_name}: {message[:60]}', flush=True)
+        print(f'[send_message] Sent to {display_name}: {message[:60]}', file=sys.stderr, flush=True)
     except Exception as e:
-        print(f'[send_message] Failed to send to {display_name}: {e}', flush=True)
+        print(f'[send_message] Failed to send to {display_name}: {e}', file=sys.stderr, flush=True)
 
 
 def _load_briefing():
@@ -702,16 +702,22 @@ async def call_tool(name: str, arguments: dict):
         path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
         if not os.path.exists(path):
             return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
-        with open(path) as f:
-            record = json.load(f)
+        try:
+            with open(path) as f:
+                record = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            return [types.TextContent(type='text', text=f'Error reading dialectic: {e}')]
         if record.get('status') == 'closed':
             return [types.TextContent(type='text', text=f'Dialectic "{record["topic"]}" is already closed.')]
         now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
         record['status'] = 'closed'
         record['closed_at'] = now
         record['updated_at'] = now
-        with open(path, 'w') as f:
-            json.dump(record, f, indent=2)
+        try:
+            with open(path, 'w') as f:
+                json.dump(record, f, indent=2)
+        except OSError as e:
+            return [types.TextContent(type='text', text=f'Error writing dialectic: {e}')]
         return [types.TextContent(type='text', text=f'Dialectic "{record["topic"]}" closed.')]
 
     raise ValueError(f'Unknown tool: {name}')
