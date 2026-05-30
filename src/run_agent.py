@@ -98,12 +98,35 @@ def evaluate_rules(briefing, rules):
         elif rule_type == 'security':
             unifi = briefing.get('unifi')
             if unifi and unifi.get('total_events', 0) > 0:
+                event_types = rule.get('event_types')  # e.g. ["person", "vehicle"]
+                if event_types:
+                    allowed = {t.lower() for t in event_types}
+                    filtered_smart = {
+                        label: count
+                        for label, count in unifi.get('smart', {}).items()
+                        if label.lower() in allowed
+                    }
+                    filtered_motion = unifi.get('motion', 0) if 'motion' in allowed else 0
+                    filtered_total = sum(filtered_smart.values()) + filtered_motion
+                    if filtered_total == 0:
+                        continue
+                    filtered_cameras = []
+                    for cam in unifi.get('cameras', []):
+                        cam_smart = {l: c for l, c in cam.get('smart', {}).items() if l.lower() in allowed}
+                        cam_motion = cam.get('motion', 0) if 'motion' in allowed else 0
+                        if cam_smart or cam_motion:
+                            filtered_cameras.append({**cam, 'smart': cam_smart, 'motion': cam_motion})
+                    filtered_unifi = {**unifi, 'smart': filtered_smart, 'motion': filtered_motion,
+                                      'total_events': filtered_total, 'cameras': filtered_cameras}
+                else:
+                    filtered_unifi = unifi
+                    filtered_total = unifi['total_events']
                 today_str = now.strftime('%Y-%m-%d')
                 candidates.append({
                     'rule': rule,
-                    'item_key': f'security:{today_str}:{unifi["total_events"]}',
-                    'data': unifi,
-                    'summary': f"{unifi['total_events']} security events {unifi.get('window_label', 'overnight')}",
+                    'item_key': f'security:{today_str}:{filtered_total}',
+                    'data': filtered_unifi,
+                    'summary': f"{filtered_total} security events {unifi.get('window_label', 'overnight')}",
                 })
 
         elif rule_type == 'news_keyword':

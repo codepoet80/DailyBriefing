@@ -27,6 +27,7 @@
       "id": "security_overnight",
       "type": "security",
       "enabled": true,
+      "event_types": ["person", "vehicle"],
       "pushover_priority": 0,
       "dedupe_hours": 24
     },
