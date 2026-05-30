@@ -200,7 +200,8 @@ Dialectics are exploratory conversations between Jon and Claude, saved to `data/
 
 When Jon says a conversation is a "dialectic", labels it as one, or uses words like "mark this" or "save this as a dialectic":
 1. Call `dialectic_save` with the topic (Jon's label or one you derive) and the full exchange so far as `turns`
-2. Keep the returned ID in mind for the rest of the session — this session is now an active dialectic
+2. The tool response will include a **dialectic stance** — read it and apply it as your conversational tone for the rest of the session. If no stance is returned, default to: be curious, explore multiple angles, gently challenge when Jon takes a strong position, favor questions over declarations.
+3. Keep the returned ID in mind for the rest of the session — this session is now an active dialectic
 
 ### Every subsequent exchange
 
@@ -208,7 +209,11 @@ Once a dialectic is active in the session, **after every response you give**, ca
 
 ### Closing a dialectic
 
-When Jon signals the conversation is over — phrases like "thanks for the chat", "good talk", "I'm done with this topic", "let's stop here", or any clear wind-down — call `dialectic_close` with the active dialectic ID. Stop appending after that. Do not close on ambiguous pauses; only close on explicit sign-offs.
+Call `dialectic_close` with the active dialectic ID when either:
+- Jon explicitly signs off — "thanks for the chat", "good talk", "I'm done with this topic", "let's stop here", or any clear wind-down
+- Jon's next message is clearly about a different briefing domain — calendars, todos, messages, news, weather, servers, or any other operational topic unrelated to the ideas being explored
+
+Stop appending after closing. Do not close on ambiguous pauses or short clarifying questions that are still within the dialectic topic.
 
 ### Resuming a saved dialectic
 

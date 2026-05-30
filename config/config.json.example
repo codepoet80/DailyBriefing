@@ -84,6 +84,9 @@
     "token": "ghp_...",
     "max_count": 30
   },
+  "dialectic": {
+    "system_prompt": "The user is curious and wants to explore ideas with you. Not everything is a conflict — treat these as shared explorations. Be curious yourself: consider multiple angles, steelman positions you might disagree with, and if the user seems to be taking a side, gently expand, challenge, and probe with them rather than just agreeing. Favor questions and observations over declarations."
+  },
   "agent": {
     "enabled": false,
     "anthropic_api_key": "sk-ant-...",

@@ -636,7 +636,14 @@ async def call_tool(name: str, arguments: dict):
         path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
         with open(path, 'w') as f:
             json.dump(record, f, indent=2)
-        return [types.TextContent(type='text', text=f'Dialectic saved — id: {dialectic_id}, topic: "{topic}", {len(turns)} turns')]
+        try:
+            dialectic_prompt = _load_config().get('dialectic', {}).get('system_prompt', '')
+        except Exception:
+            dialectic_prompt = ''
+        reply = f'Dialectic saved — id: {dialectic_id}, topic: "{topic}", {len(turns)} turns'
+        if dialectic_prompt:
+            reply += f'\n\nDialectic stance for this session: {dialectic_prompt}'
+        return [types.TextContent(type='text', text=reply)]
 
     if name == 'dialectic_append':
         from datetime import datetime, timezone
