@@ -192,6 +192,32 @@ Time-of-day salutation (Good morning/afternoon/evening) using the name from `gre
 
 Fetches events from Unifi Protect's local REST API for a configurable overnight window (default 10pm–6am). Authenticates with username/password; requires `X-CSRF-Token` header on subsequent requests. Summarises smart detections (Person, Vehicle, etc.) and motion counts per camera. Section hidden if no overnight events.
 
+## Dialectics
+
+Dialectics are exploratory conversations between Jon and Claude, saved to `data/conversations/<uuid>.json` via the MCP server.
+
+### Starting a dialectic
+
+When Jon says a conversation is a "dialectic", labels it as one, or uses words like "mark this" or "save this as a dialectic":
+1. Call `dialectic_save` with the topic (Jon's label or one you derive) and the full exchange so far as `turns`
+2. Keep the returned ID in mind for the rest of the session — this session is now an active dialectic
+
+### Every subsequent exchange
+
+Once a dialectic is active in the session, **after every response you give**, call `dialectic_append` with the two new turns (the user's question and your answer) before finishing. Do not wait to be asked. This applies for the remainder of the session unless Jon closes the dialectic.
+
+### Closing a dialectic
+
+When Jon signals the conversation is over — phrases like "thanks for the chat", "good talk", "I'm done with this topic", "let's stop here", or any clear wind-down — call `dialectic_close` with the active dialectic ID. Stop appending after that. Do not close on ambiguous pauses; only close on explicit sign-offs.
+
+### Resuming a saved dialectic
+
+When Jon asks to "resume", "continue", or "load" a past dialectic: call `dialectic_get` to retrieve it, then treat the session as an active dialectic — appending every exchange automatically as above.
+
+**When to call `dialectic_list` / `dialectic_get`:** When Jon asks to see, review, or load a past dialectic.
+
+The `briefing://dialectics` MCP resource gives a quick index of all saved dialectics.
+
 ## Known Issues / Future Ideas
 
 - ESV API key needed for ESV translation; blank key falls back to BibleGateway (NIV)

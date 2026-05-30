@@ -282,6 +282,24 @@ async def list_tools():
             },
         ),
         types.Tool(
+            name='dialectic_close',
+            description=(
+                'Mark a dialectic as closed. Call this when the user signals the conversation is over '
+                '(e.g. "thanks for the chat", "I\'m done with this topic"). '
+                'Sets closed_at and status=closed on the record. No more turns should be appended after this.'
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'id': {
+                        'type': 'string',
+                        'description': 'Dialectic ID to close',
+                    },
+                },
+                'required': ['id'],
+            },
+        ),
+        types.Tool(
             name='send_message',
             description=(
                 'Send an iMessage/SMS via the local message bridge. '
@@ -667,6 +685,27 @@ async def call_tool(name: str, arguments: dict):
         with open(path) as f:
             record = json.load(f)
         return [types.TextContent(type='text', text=json.dumps(record, indent=2))]
+
+    if name == 'dialectic_close':
+        from datetime import datetime, timezone
+        dialectic_id = arguments.get('id', '').strip()
+        if not dialectic_id:
+            return [types.TextContent(type='text', text='Error: id is required')]
+        _ensure_conversations_dir()
+        path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
+        if not os.path.exists(path):
+            return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
+        with open(path) as f:
+            record = json.load(f)
+        if record.get('status') == 'closed':
+            return [types.TextContent(type='text', text=f'Dialectic "{record["topic"]}" is already closed.')]
+        now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+        record['status'] = 'closed'
+        record['closed_at'] = now
+        record['updated_at'] = now
+        with open(path, 'w') as f:
+            json.dump(record, f, indent=2)
+        return [types.TextContent(type='text', text=f'Dialectic "{record["topic"]}" closed.')]
 
     raise ValueError(f'Unknown tool: {name}')
 
