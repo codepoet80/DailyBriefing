@@ -300,6 +300,25 @@ async def list_tools():
             },
         ),
         types.Tool(
+            name='dialectic_resume',
+            description=(
+                'Re-open a previously closed dialectic so the conversation can continue. '
+                'Clears the closed_at timestamp and sets status back to open. '
+                'Returns the full record (including prior turns and topic) so the session can resume. '
+                'Call this when the user asks to resume, reopen, or continue a past dialectic.'
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'id': {
+                        'type': 'string',
+                        'description': 'Dialectic ID to re-open',
+                    },
+                },
+                'required': ['id'],
+            },
+        ),
+        types.Tool(
             name='send_message',
             description=(
                 'Send an iMessage/SMS via the local message bridge. '
@@ -719,6 +738,41 @@ async def call_tool(name: str, arguments: dict):
         except OSError as e:
             return [types.TextContent(type='text', text=f'Error writing dialectic: {e}')]
         return [types.TextContent(type='text', text=f'Dialectic "{record["topic"]}" closed.')]
+
+    if name == 'dialectic_resume':
+        from datetime import datetime, timezone
+        dialectic_id = arguments.get('id', '').strip()
+        if not dialectic_id:
+            return [types.TextContent(type='text', text='Error: id is required')]
+        _ensure_conversations_dir()
+        path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
+        if not os.path.exists(path):
+            return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
+        try:
+            with open(path) as f:
+                record = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            return [types.TextContent(type='text', text=f'Error reading dialectic: {e}')]
+        if record.get('status') != 'closed':
+            return [types.TextContent(type='text', text=f'Dialectic "{record["topic"]}" is already open.')]
+        now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+        record['status'] = 'open'
+        record.pop('closed_at', None)
+        record['updated_at'] = now
+        try:
+            with open(path, 'w') as f:
+                json.dump(record, f, indent=2)
+        except OSError as e:
+            return [types.TextContent(type='text', text=f'Error writing dialectic: {e}')]
+        try:
+            dialectic_prompt = _load_config().get('dialectic', {}).get('system_prompt', '')
+        except Exception:
+            dialectic_prompt = ''
+        reply = f'Dialectic "{record["topic"]}" reopened — id: {dialectic_id}, {len(record.get("turns", []))} prior turns'
+        if dialectic_prompt:
+            reply += f'\n\nDialectic stance for this session: {dialectic_prompt}'
+        reply += f'\n\nPrior conversation:\n{json.dumps(record, indent=2)}'
+        return [types.TextContent(type='text', text=reply)]
 
     raise ValueError(f'Unknown tool: {name}')
 

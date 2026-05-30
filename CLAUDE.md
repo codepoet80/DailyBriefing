@@ -217,9 +217,11 @@ Stop appending after closing. Do not close on ambiguous pauses or short clarifyi
 
 ### Resuming a saved dialectic
 
-When Jon asks to "resume", "continue", or "load" a past dialectic: call `dialectic_get` to retrieve it, then treat the session as an active dialectic — appending every exchange automatically as above.
+When Jon asks to "resume", "continue", or "reopen" a past dialectic: call `dialectic_resume` with the ID. This re-opens the record (clears `closed_at`, sets `status=open`) and returns the full prior conversation. Treat the session as an active dialectic from that point — appending every exchange automatically as above.
 
-**When to call `dialectic_list` / `dialectic_get`:** When Jon asks to see, review, or load a past dialectic.
+To read a dialectic without re-opening it (e.g. Jon just wants to review it), call `dialectic_get` instead.
+
+**When to call `dialectic_list` / `dialectic_get`:** When Jon asks to see or review a past dialectic without continuing it.
 
 The `briefing://dialectics` MCP resource gives a quick index of all saved dialectics.
 
