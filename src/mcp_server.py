@@ -15,6 +15,7 @@ from mcp import types
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 DATA_DIR = os.path.join(BASE_DIR, 'data')
 CONFIG_DIR = os.path.join(BASE_DIR, 'config')
+CONVERSATIONS_DIR = os.path.join(DATA_DIR, 'conversations')
 
 app = Server('daily-briefing-agent')
 
@@ -55,6 +56,33 @@ def _load_config():
         raise ValueError(f'config.json is malformed: {e}')
 
 
+def _ensure_conversations_dir():
+    os.makedirs(CONVERSATIONS_DIR, exist_ok=True)
+
+
+def _list_dialectics():
+    if not os.path.isdir(CONVERSATIONS_DIR):
+        return []
+    results = []
+    for fname in sorted(os.listdir(CONVERSATIONS_DIR)):
+        if not fname.endswith('.json'):
+            continue
+        path = os.path.join(CONVERSATIONS_DIR, fname)
+        try:
+            with open(path) as f:
+                d = json.load(f)
+            results.append({
+                'id': d.get('id', fname[:-5]),
+                'topic': d.get('topic', ''),
+                'created_at': d.get('created_at', ''),
+                'updated_at': d.get('updated_at', ''),
+                'turn_count': len(d.get('turns', [])),
+            })
+        except (json.JSONDecodeError, OSError):
+            pass
+    return results
+
+
 @app.list_resources()
 async def list_resources():
     return [
@@ -70,6 +98,12 @@ async def list_resources():
             description='agent_state.json — push history, acknowledgments, rule stats',
             mimeType='application/json',
         ),
+        types.Resource(
+            uri='briefing://dialectics',
+            name='Dialectics',
+            description='Index of saved dialectic conversations (id, topic, date, turn count)',
+            mimeType='application/json',
+        ),
     ]
 
 
@@ -83,6 +117,8 @@ async def read_resource(uri: str):
             with open(path) as f:
                 return f.read()
         return '{}'
+    if uri == 'briefing://dialectics':
+        return json.dumps(_list_dialectics(), indent=2)
     raise ValueError(f'Unknown resource: {uri}')
 
 
@@ -153,6 +189,96 @@ async def list_tools():
                     },
                 },
                 'required': ['title', 'date'],
+            },
+        ),
+        types.Tool(
+            name='dialectic_save',
+            description=(
+                'Save an exploratory conversation as a named dialectic. '
+                'Call this when the user marks a discussion as a dialectic. '
+                'Creates a new file in data/conversations/ keyed by a generated ID.'
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'topic': {
+                        'type': 'string',
+                        'description': 'Short title / topic for this dialectic',
+                    },
+                    'turns': {
+                        'type': 'array',
+                        'description': 'Ordered list of conversation turns',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'role': {
+                                    'type': 'string',
+                                    'enum': ['user', 'assistant'],
+                                    'description': 'Who spoke this turn',
+                                },
+                                'content': {
+                                    'type': 'string',
+                                    'description': 'Text of the turn',
+                                },
+                            },
+                            'required': ['role', 'content'],
+                        },
+                    },
+                    'tags': {
+                        'type': 'array',
+                        'items': {'type': 'string'},
+                        'description': 'Optional keyword tags for the dialectic',
+                    },
+                },
+                'required': ['topic', 'turns'],
+            },
+        ),
+        types.Tool(
+            name='dialectic_append',
+            description='Append one or more turns to an existing dialectic by ID.',
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'id': {
+                        'type': 'string',
+                        'description': 'Dialectic ID (from dialectic_list or dialectic_save)',
+                    },
+                    'turns': {
+                        'type': 'array',
+                        'description': 'New turns to append',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'role': {
+                                    'type': 'string',
+                                    'enum': ['user', 'assistant'],
+                                },
+                                'content': {'type': 'string'},
+                            },
+                            'required': ['role', 'content'],
+                        },
+                    },
+                },
+                'required': ['id', 'turns'],
+            },
+        ),
+        types.Tool(
+            name='dialectic_list',
+            description='List all saved dialectics — returns id, topic, dates, and turn count.',
+            inputSchema={'type': 'object', 'properties': {}},
+        ),
+        types.Tool(
+            name='dialectic_get',
+            description='Load the full content of a dialectic by ID.',
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'id': {
+                        'type': 'string',
+                        'description': 'Dialectic ID',
+                    },
+                },
+                'required': ['id'],
             },
         ),
         types.Tool(
@@ -461,6 +587,86 @@ async def call_tool(name: str, arguments: dict):
             task.add_done_callback(_pending_tasks.discard)
             when = send_at.strftime('%-I:%M %p')
             return [types.TextContent(type='text', text=f'Scheduled to {display_name} at {when}: {message}')]
+
+    if name == 'dialectic_save':
+        import uuid
+        from datetime import datetime, timezone
+        topic = arguments.get('topic', '').strip()
+        turns_raw = arguments.get('turns', [])
+        tags = arguments.get('tags', [])
+        if not topic:
+            return [types.TextContent(type='text', text='Error: topic is required')]
+        if not turns_raw:
+            return [types.TextContent(type='text', text='Error: turns must not be empty')]
+        _ensure_conversations_dir()
+        now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+        dialectic_id = str(uuid.uuid4())
+        now_ts = now
+        turns = [
+            {'role': t['role'], 'content': t['content'], 'timestamp': now_ts}
+            for t in turns_raw
+            if t.get('role') in ('user', 'assistant') and t.get('content')
+        ]
+        record = {
+            'id': dialectic_id,
+            'topic': topic,
+            'tags': tags,
+            'created_at': now,
+            'updated_at': now,
+            'turns': turns,
+        }
+        path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
+        with open(path, 'w') as f:
+            json.dump(record, f, indent=2)
+        return [types.TextContent(type='text', text=f'Dialectic saved — id: {dialectic_id}, topic: "{topic}", {len(turns)} turns')]
+
+    if name == 'dialectic_append':
+        from datetime import datetime, timezone
+        dialectic_id = arguments.get('id', '').strip()
+        turns_raw = arguments.get('turns', [])
+        if not dialectic_id:
+            return [types.TextContent(type='text', text='Error: id is required')]
+        if not turns_raw:
+            return [types.TextContent(type='text', text='Error: turns must not be empty')]
+        _ensure_conversations_dir()
+        path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
+        if not os.path.exists(path):
+            return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
+        with open(path) as f:
+            record = json.load(f)
+        now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+        new_turns = [
+            {'role': t['role'], 'content': t['content'], 'timestamp': now}
+            for t in turns_raw
+            if t.get('role') in ('user', 'assistant') and t.get('content')
+        ]
+        record['turns'].extend(new_turns)
+        record['updated_at'] = now
+        with open(path, 'w') as f:
+            json.dump(record, f, indent=2)
+        total = len(record['turns'])
+        return [types.TextContent(type='text', text=f'Appended {len(new_turns)} turn(s) to "{record["topic"]}" — now {total} turns total')]
+
+    if name == 'dialectic_list':
+        items = _list_dialectics()
+        if not items:
+            return [types.TextContent(type='text', text='No dialectics saved yet.')]
+        lines = ['Saved dialectics:']
+        for d in items:
+            lines.append(f'  {d["id"]} | {d["topic"]} | {d["turn_count"]} turns | {d["updated_at"]}')
+        return [types.TextContent(type='text', text='\n'.join(lines))]
+
+    if name == 'dialectic_get':
+        dialectic_id = arguments.get('id', '').strip()
+        if not dialectic_id:
+            return [types.TextContent(type='text', text='Error: id is required')]
+        _ensure_conversations_dir()
+        path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
+        if not os.path.exists(path):
+            return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
+        with open(path) as f:
+            record = json.load(f)
+        return [types.TextContent(type='text', text=json.dumps(record, indent=2))]
 
     raise ValueError(f'Unknown tool: {name}')
 
