@@ -397,6 +397,9 @@ async def call_tool(name: str, arguments: dict):
         device = agent_cfg.get('pushover_device', '')
         if device:
             payload['device'] = device
+        sound = agent_cfg.get('pushover_sound', '')
+        if sound:
+            payload['sound'] = sound
         try:
             r = req.post('https://api.pushover.net/1/messages.json', data=payload, timeout=10)
             r.raise_for_status()

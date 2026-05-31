@@ -252,7 +252,7 @@ def write_notification_texts(candidates, config):
     return {t['id']: t for t in json.loads(text)}
 
 
-def send_pushover(app_token, user_key, title, message, priority=0, device=''):
+def send_pushover(app_token, user_key, title, message, priority=0, device='', sound=''):
     payload = {
         'token': app_token,
         'user': user_key,
@@ -262,6 +262,8 @@ def send_pushover(app_token, user_key, title, message, priority=0, device=''):
     }
     if device:
         payload['device'] = device
+    if sound:
+        payload['sound'] = sound
     if priority == 1:
         payload['retry'] = 60
         payload['expire'] = 3600
@@ -333,7 +335,8 @@ def main():
 
         try:
             receipt = send_pushover(app_token, user_key, title, message, priority,
-                                    device=agent_cfg.get('pushover_device', ''))
+                                    device=agent_cfg.get('pushover_device', ''),
+                                    sound=agent_cfg.get('pushover_sound', ''))
             memory.record_push(hash_key, candidate['rule']['id'], candidate['summary'], receipt)
             memory.increment_stat(candidate['rule']['id'], 'fired')
             print(f'  Pushed [{candidate["rule"]["id"]}]: {title}')
