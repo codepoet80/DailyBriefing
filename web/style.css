@@ -626,10 +626,12 @@ h2 {
 .chat-form {
     display: block;
     width: 100%;
+    overflow: hidden; /* contain floats */
 }
 
 .chat-input {
-    width: 75%;
+    float: left;
+    width: 76%;
     padding: 6px 8px;
     font-size: 14px;
     font-family: Arial, Helvetica, sans-serif;
@@ -638,8 +640,8 @@ h2 {
 }
 
 .chat-send {
+    float: right;
     width: 22%;
-    margin-left: 2%;
     padding: 6px 8px;
     font-size: 14px;
     font-family: Arial, Helvetica, sans-serif;
@@ -647,6 +649,7 @@ h2 {
     color: #fff;
     border: 1px solid #143959;
     cursor: pointer;
+    box-sizing: border-box;
 }
 
 .chat-send[disabled] {

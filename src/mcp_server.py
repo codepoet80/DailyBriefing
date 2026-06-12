@@ -347,6 +347,24 @@ async def list_tools():
                 'required': ['recipient', 'message'],
             },
         ),
+        types.Tool(
+            name='get_time',
+            description=(
+                "Get the current local date and time on the briefing server. "
+                "Call this whenever the user asks what time/day/date it is, or when "
+                "you need 'now' to interpret a relative time."
+            ),
+            inputSchema={'type': 'object', 'properties': {}},
+        ),
+        types.Tool(
+            name='get_public_ip',
+            description=(
+                "Get the public IPv4 address of the home internet connection the "
+                "briefing server is on. Useful for remote access checks and "
+                "diagnostics."
+            ),
+            inputSchema={'type': 'object', 'properties': {}},
+        ),
     ]
 
 
@@ -776,6 +794,27 @@ async def call_tool(name: str, arguments: dict):
             reply += f'\n\nDialectic stance for this session: {dialectic_prompt}'
         reply += f'\n\nPrior conversation:\n{json.dumps(record, indent=2)}'
         return [types.TextContent(type='text', text=reply)]
+
+    if name == 'get_time':
+        from datetime import datetime, timezone
+        local = datetime.now().astimezone()
+        utc = datetime.now(timezone.utc)
+        tz_name = local.strftime('%Z') or local.tzname() or 'local'
+        reply = (
+            f'Local: {local.strftime("%A, %B %-d, %Y at %-I:%M:%S %p")} ({tz_name})\n'
+            f'ISO local: {local.isoformat(timespec="seconds")}\n'
+            f'UTC: {utc.isoformat(timespec="seconds").replace("+00:00", "Z")}'
+        )
+        return [types.TextContent(type='text', text=reply)]
+
+    if name == 'get_public_ip':
+        try:
+            r = req.get('https://api.ipify.org', timeout=5)
+            r.raise_for_status()
+            ip = r.text.strip()
+            return [types.TextContent(type='text', text=f'Public IP: {ip}')]
+        except Exception as e:
+            return [types.TextContent(type='text', text=f'Error fetching public IP: {e}')]
 
     raise ValueError(f'Unknown tool: {name}')
 

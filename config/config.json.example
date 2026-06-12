@@ -112,7 +112,9 @@
       "dialectic_resume",
       "add_todo",
       "add_calendar_event",
-      "send_notification"
+      "send_notification",
+      "get_time",
+      "get_public_ip"
     ],
     "system_prompt_extra": ""
   }
