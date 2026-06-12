@@ -713,9 +713,19 @@ h2 {
     overflow: hidden; /* contain floats */
 }
 
+.chat-input {
+    float: left;
+    width: 70%;
+    padding: 6px 8px;
+    font-size: 14px;
+    font-family: Arial, Helvetica, sans-serif;
+    border: 1px solid #bbb;
+    box-sizing: border-box;
+}
+
 .chat-send {
     float: right;
-    width: 76px;
+    width: 28%;
     padding: 6px 8px;
     font-size: 14px;
     font-family: Arial, Helvetica, sans-serif;
@@ -723,17 +733,6 @@ h2 {
     color: #fff;
     border: 1px solid #143959;
     cursor: pointer;
-    box-sizing: border-box;
-}
-
-.chat-input {
-    display: block;
-    width: auto;
-    margin-right: 84px;       /* button width + small gap */
-    padding: 6px 8px;
-    font-size: 14px;
-    font-family: Arial, Helvetica, sans-serif;
-    border: 1px solid #bbb;
     box-sizing: border-box;
 }
 
