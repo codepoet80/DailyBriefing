@@ -255,11 +255,12 @@ def _extract_text(content_blocks):
 
 
 def _summarize_tool_result(text, max_len=140):
-    text = (text or '').strip().splitlines()
-    first = text[0] if text else ''
-    if len(first) > max_len:
-        first = first[:max_len - 1] + '…'
-    return first
+    if not text:
+        return ''
+    flat = ' '.join(text.strip().split())  # collapse newlines + runs of spaces
+    if len(flat) > max_len:
+        flat = flat[:max_len - 1] + '…'
+    return flat
 
 
 def _track_active_dialectic(state, tool_name, tool_input, result_text):
