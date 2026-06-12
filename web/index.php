@@ -476,7 +476,29 @@ if (file_exists($_cfg_path)) {
 <?php if ($chat_enabled): ?>
 <div class="section section-chat" id="chat">
     <h2>Chat</h2>
-    <div id="chat-log" class="chat-log" aria-live="polite"></div>
+    <div id="chat-log" class="chat-log" aria-live="polite"><?php
+        $sid = isset($_COOKIE['db_chat_sid']) ? $_COOKIE['db_chat_sid'] : '';
+        if ($sid && preg_match('/^[A-Za-z0-9_-]{8,64}$/', $sid)) {
+            $sess_path = dirname(__FILE__) . '/../data/chat_sessions/' . $sid . '.json';
+            if (file_exists($sess_path)) {
+                $sess = json_decode(file_get_contents($sess_path), true);
+                if (is_array($sess) && !empty($sess['turns'])) {
+                    foreach (array_slice($sess['turns'], -4) as $turn) {
+                        $r = isset($turn['role']) ? $turn['role'] : '';
+                        if ($r !== 'user' && $r !== 'assistant') continue;
+                        $text = isset($turn['content']) ? $turn['content'] : '';
+                        if ($text === '') continue;
+                        $label = $r === 'user' ? 'You' : 'Agent';
+                        $cls   = $r === 'user' ? 'chat-turn-user' : 'chat-turn-agent';
+                        echo '<div class="chat-turn ' . $cls . '">';
+                        echo '<span class="chat-role">' . h($label) . ':</span> ';
+                        echo nl2br(h($text));
+                        echo '</div>';
+                    }
+                }
+            }
+        }
+    ?></div>
     <form id="chat-form" class="chat-form" onsubmit="return chatSubmit(event);">
         <input type="text" id="chat-input" class="chat-input" autocomplete="off"
                placeholder="Ask, save a dialectic, add a todo&hellip;">

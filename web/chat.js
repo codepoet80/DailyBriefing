@@ -128,6 +128,13 @@
         }));
     }
 
+    // If the server pre-rendered some history into chat-log, snap to the bottom
+    // so the most recent turn is the one visible above the input.
+    (function initScroll() {
+        var log = el('chat-log');
+        if (log) { log.scrollTop = log.scrollHeight; }
+    })();
+
     window.chatSubmit = function (evt) {
         if (evt && evt.preventDefault) { evt.preventDefault(); }
         var input = el('chat-input');
