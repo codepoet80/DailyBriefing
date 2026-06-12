@@ -99,6 +99,18 @@ def _resolve_dialectic_ref(ref):
     if len(matches) > 1:
         return ('ambiguous', matches)
 
+    # Token fallback: every word in the ref (>=2 chars) must appear as a
+    # substring of the topic, in any order. Catches refs like
+    # "bottom-up top-down" against "Polanyi: bottom-up vs top-down".
+    tokens = [t for t in re.findall(r'\w+', ref.lower()) if len(t) >= 2]
+    if tokens:
+        token_hits = [d for d in items
+                      if all(t in d['topic'].lower() for t in tokens)]
+        if len(token_hits) == 1:
+            return ('found', token_hits[0]['id'])
+        if len(token_hits) > 1:
+            return ('ambiguous', token_hits)
+
     return ('missing', None)
 
 
