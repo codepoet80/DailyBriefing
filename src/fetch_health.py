@@ -43,26 +43,42 @@ def _day_range(days):
     return [today - timedelta(days=days - 1 - i) for i in range(days)]
 
 
-def _trend(sparkline, direction='down'):
-    """Compare last 7 days' avg vs prior 7 days' avg. Direction is the "good"
-    direction so we can return 'good'/'bad'/'flat' in addition to up/down."""
-    vals = [(i, v) for i, v in enumerate(sparkline) if v is not None]
-    if len(vals) < 2:
+def _weight_slope_trend(sparkline, goal_direction='down'):
+    """Compare recent 3 weight logs to the prior 3. Skip if not enough data."""
+    vals = [v for v in sparkline if v is not None]
+    if len(vals) < 4:
         return 'flat'
-    n = len(sparkline)
-    recent = [v for i, v in vals if i >= n - 7]
-    prior  = [v for i, v in vals if n - 14 <= i < n - 7]
-    if not recent or not prior:
+    recent = vals[-3:]
+    prior  = vals[-6:-3] if len(vals) >= 6 else vals[:-3]
+    if not prior:
         return 'flat'
     r = sum(recent) / len(recent)
     p = sum(prior)  / len(prior)
     diff = r - p
-    threshold = max(abs(p) * 0.02, 0.5)
+    threshold = max(abs(p) * 0.005, 0.3)  # 0.5% or 0.3 lb, whichever bigger
     if abs(diff) < threshold:
         return 'flat'
-    if direction == 'down':
+    if goal_direction == 'down':
         return 'good' if diff < 0 else 'bad'
     return 'good' if diff > 0 else 'bad'
+
+
+def _target_status(value, target, under_is_good=True,
+                   good_ratio=0.6, bad_ratio=1.0):
+    """Target-based status. For 'under_is_good' (e.g. alcohol):
+       good when value <= target*good_ratio, bad when value > target.
+       For 'over_is_good' (e.g. exercise):
+       good when value >= target, bad when value < target*good_ratio."""
+    if target is None or target <= 0:
+        return 'flat'
+    ratio = float(value) / float(target)
+    if under_is_good:
+        if ratio > bad_ratio:  return 'bad'
+        if ratio <= good_ratio: return 'good'
+        return 'flat'
+    if ratio >= 1.0:        return 'good'
+    if ratio < good_ratio:  return 'bad'
+    return 'flat'
 
 
 def _weight_summary(cfg, days):
@@ -90,7 +106,7 @@ def _weight_summary(cfg, days):
         'latest_date': latest_date,
         'today_logged': today_iso in by_day,
         'sparkline': spark,
-        'trend': _trend(spark, cfg.get('weight', {}).get('goal_direction', 'down')),
+        'trend': _weight_slope_trend(spark, cfg.get('weight', {}).get('goal_direction', 'down')),
         'unit': cfg.get('weight', {}).get('unit', 'lbs'),
     }
 
@@ -123,13 +139,14 @@ def _alcohol_summary(cfg, days):
 
     raw_today = [r.get('raw_input', '') for r in rows if r.get('date') == today_iso]
 
+    target = cfg.get('alcohol', {}).get('weekly_target_drinks')
     return {
         'today_drinks':   round(today_drinks, 2),
         'week_drinks':    week_drinks,
         'today_logged':   today_iso in by_day,
         'sparkline':      spark,
-        'trend':          _trend(spark, direction='down'),
-        'weekly_target':  cfg.get('alcohol', {}).get('weekly_target_drinks'),
+        'trend':          _target_status(week_drinks, target, under_is_good=True),
+        'weekly_target':  target,
         'raw_today':      raw_today,
     }
 
@@ -151,13 +168,14 @@ def _exercise_summary(cfg, days):
         last = max(rows, key=lambda r: (r.get('date', ''), r.get('ts', '')))
         last_kind = last.get('kind', '') or last.get('intensity', '')
 
+    target = cfg.get('exercise', {}).get('weekly_target_minutes')
     return {
         'today_minutes': today_minutes,
         'week_minutes':  week_minutes,
         'today_logged':  today_iso in by_day,
         'sparkline':     spark,
-        'trend':         _trend(spark, direction='up'),
-        'weekly_target': cfg.get('exercise', {}).get('weekly_target_minutes'),
+        'trend':         _target_status(week_minutes, target, under_is_good=False),
+        'weekly_target': target,
         'last_kind':     last_kind,
     }
 
