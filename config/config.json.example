@@ -111,6 +111,7 @@
     "session_ttl_hours": 24,
     "max_tool_iterations": 8,
     "allowed_tools": [
+      "refresh_briefing",
       "dialectic_save",
       "dialectic_append",
       "dialectic_list",
@@ -120,6 +121,7 @@
       "add_todo",
       "add_calendar_event",
       "send_notification",
+      "send_message",
       "get_time",
       "get_public_ip",
       "log_weight",
