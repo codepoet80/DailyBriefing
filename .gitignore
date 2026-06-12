@@ -9,6 +9,8 @@ data/briefing.json
 data/xkcd_state.json
 data/briefing.log
 data/agent_state.json
+data/chat_sessions/
+data/*
 
 # Python
 .venv/

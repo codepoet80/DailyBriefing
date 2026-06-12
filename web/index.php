@@ -364,7 +364,35 @@ $regular_count = count($news_regular);
 </div>
 <?php endif; ?>
 
-
+<?php
+$chat_cfg     = isset($briefing['chat_agent_ui']) ? $briefing['chat_agent_ui'] : array();
+$chat_enabled = false;
+$chat_needs_secret = false;
+$_cfg_path = dirname(__FILE__) . '/../config/config.json';
+if (file_exists($_cfg_path)) {
+    $_cfg = json_decode(file_get_contents($_cfg_path), true);
+    if (is_array($_cfg) && !empty($_cfg['chat_agent']['enabled'])) {
+        $chat_enabled = true;
+        $chat_needs_secret = !empty($_cfg['chat_agent']['shared_secret']);
+    }
+}
+?>
+<?php if ($chat_enabled): ?>
+<div class="section section-chat" id="chat">
+    <h2>Chat</h2>
+    <div id="chat-log" class="chat-log" aria-live="polite"></div>
+    <form id="chat-form" class="chat-form" onsubmit="return chatSubmit(event);">
+        <input type="text" id="chat-input" class="chat-input" autocomplete="off"
+               placeholder="Ask, save a dialectic, add a todo&hellip;">
+        <button type="submit" id="chat-send" class="chat-send">Send</button>
+    </form>
+    <div id="chat-status" class="chat-status"></div>
+</div>
+<script type="text/javascript">
+var CHAT_NEEDS_SECRET = <?php echo $chat_needs_secret ? 'true' : 'false'; ?>;
+</script>
+<script type="text/javascript" src="chat.js"></script>
+<?php endif; ?>
 
 <p class="footer">Generated <?php echo h($generated_at); ?> &middot; <?php echo h($run_type); ?> run</p>
 

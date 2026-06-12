@@ -31,3 +31,4 @@ fi
 
 "$VENV/bin/python3" -u src/build_briefing.py 2>&1 | tee -a data/briefing.log
 "$VENV/bin/python3" -u src/run_agent.py 2>&1 | tee -a data/briefing.log
+"$VENV/bin/python3" -u src/agent/sessions.py prune 24 2>&1 | tee -a data/briefing.log

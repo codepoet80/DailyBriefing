@@ -95,5 +95,25 @@
     "pushover_user_key": "YOUR_PUSHOVER_USER_KEY",
     "pushover_device": "",
     "pushover_sound": ""
+  },
+  "chat_agent": {
+    "enabled": false,
+    "model": "claude-sonnet-4-6",
+    "shared_secret": "",
+    "max_turns_in_context": 20,
+    "session_ttl_hours": 24,
+    "max_tool_iterations": 8,
+    "allowed_tools": [
+      "dialectic_save",
+      "dialectic_append",
+      "dialectic_list",
+      "dialectic_get",
+      "dialectic_close",
+      "dialectic_resume",
+      "add_todo",
+      "add_calendar_event",
+      "send_notification"
+    ],
+    "system_prompt_extra": ""
   }
 }
