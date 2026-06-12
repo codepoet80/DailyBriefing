@@ -60,6 +60,57 @@ def _ensure_conversations_dir():
     os.makedirs(CONVERSATIONS_DIR, exist_ok=True)
 
 
+def _resolve_dialectic_ref(ref):
+    """Resolve an id-or-topic reference to a real UUID id.
+
+    Returns one of:
+      ('found',     id_str)         single match (by id or unique substring)
+      ('ambiguous', [match dicts])  multiple topic matches
+      ('missing',   None)           nothing matched
+    """
+    import re
+    ref = (ref or '').strip()
+    if not ref:
+        return ('missing', None)
+
+    # Direct UUID hit: file exists with this exact id.
+    path = os.path.join(CONVERSATIONS_DIR, f'{ref}.json')
+    if os.path.isfile(path):
+        return ('found', ref)
+
+    items = _list_dialectics()
+
+    # Allow id prefix match too (UUIDs are long; first 8 chars are usually unique).
+    if re.match(r'^[0-9a-f-]+$', ref.lower()):
+        id_hits = [d for d in items if d['id'].lower().startswith(ref.lower())]
+        if len(id_hits) == 1:
+            return ('found', id_hits[0]['id'])
+        if len(id_hits) > 1:
+            return ('ambiguous', id_hits)
+
+    # Topic substring (case-insensitive). Also try ref-with-spaces in case the
+    # agent passed a kebab-case version like "polanyi-bottom-up".
+    needle  = ref.lower()
+    spaces  = ref.replace('-', ' ').replace('_', ' ').lower()
+    matches = [d for d in items
+               if needle in d['topic'].lower() or spaces in d['topic'].lower()]
+    if len(matches) == 1:
+        return ('found', matches[0]['id'])
+    if len(matches) > 1:
+        return ('ambiguous', matches)
+
+    return ('missing', None)
+
+
+def _format_ambiguous(matches):
+    lines = ['Multiple dialectics match — pick an id:']
+    for d in matches[:10]:
+        lines.append(f'  {d["id"]} | {d["topic"]} | {d["turn_count"]} turns | {d["updated_at"]}')
+    if len(matches) > 10:
+        lines.append(f'  …and {len(matches) - 10} more')
+    return '\n'.join(lines)
+
+
 def _list_dialectics():
     if not os.path.isdir(CONVERSATIONS_DIR):
         return []
@@ -241,7 +292,7 @@ async def list_tools():
                 'properties': {
                     'id': {
                         'type': 'string',
-                        'description': 'Dialectic ID (from dialectic_list or dialectic_save)',
+                        'description': 'Dialectic UUID, short id prefix, or a topic substring (e.g. "polanyi")',
                     },
                     'turns': {
                         'type': 'array',
@@ -275,7 +326,7 @@ async def list_tools():
                 'properties': {
                     'id': {
                         'type': 'string',
-                        'description': 'Dialectic ID',
+                        'description': 'Dialectic UUID, short id prefix, or a topic substring',
                     },
                 },
                 'required': ['id'],
@@ -293,7 +344,7 @@ async def list_tools():
                 'properties': {
                     'id': {
                         'type': 'string',
-                        'description': 'Dialectic ID to close',
+                        'description': 'Dialectic UUID, short id prefix, or topic substring to close',
                     },
                 },
                 'required': ['id'],
@@ -312,7 +363,7 @@ async def list_tools():
                 'properties': {
                     'id': {
                         'type': 'string',
-                        'description': 'Dialectic ID to re-open',
+                        'description': 'Dialectic UUID, short id prefix, or topic substring to re-open',
                     },
                 },
                 'required': ['id'],
@@ -787,16 +838,20 @@ async def call_tool(name: str, arguments: dict):
 
     if name == 'dialectic_append':
         from datetime import datetime, timezone
-        dialectic_id = arguments.get('id', '').strip()
+        ref = arguments.get('id', '').strip()
         turns_raw = arguments.get('turns', [])
-        if not dialectic_id:
+        if not ref:
             return [types.TextContent(type='text', text='Error: id is required')]
         if not turns_raw:
             return [types.TextContent(type='text', text='Error: turns must not be empty')]
         _ensure_conversations_dir()
+        status, payload = _resolve_dialectic_ref(ref)
+        if status == 'missing':
+            return [types.TextContent(type='text', text=f'Error: dialectic "{ref}" not found')]
+        if status == 'ambiguous':
+            return [types.TextContent(type='text', text=_format_ambiguous(payload))]
+        dialectic_id = payload
         path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
-        if not os.path.exists(path):
-            return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
         with open(path) as f:
             record = json.load(f)
         now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
@@ -822,26 +877,33 @@ async def call_tool(name: str, arguments: dict):
         return [types.TextContent(type='text', text='\n'.join(lines))]
 
     if name == 'dialectic_get':
-        dialectic_id = arguments.get('id', '').strip()
-        if not dialectic_id:
+        ref = arguments.get('id', '').strip()
+        if not ref:
             return [types.TextContent(type='text', text='Error: id is required')]
         _ensure_conversations_dir()
-        path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
-        if not os.path.exists(path):
-            return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
+        status, payload = _resolve_dialectic_ref(ref)
+        if status == 'missing':
+            return [types.TextContent(type='text', text=f'Error: dialectic "{ref}" not found')]
+        if status == 'ambiguous':
+            return [types.TextContent(type='text', text=_format_ambiguous(payload))]
+        path = os.path.join(CONVERSATIONS_DIR, f'{payload}.json')
         with open(path) as f:
             record = json.load(f)
         return [types.TextContent(type='text', text=json.dumps(record, indent=2))]
 
     if name == 'dialectic_close':
         from datetime import datetime, timezone
-        dialectic_id = arguments.get('id', '').strip()
-        if not dialectic_id:
+        ref = arguments.get('id', '').strip()
+        if not ref:
             return [types.TextContent(type='text', text='Error: id is required')]
         _ensure_conversations_dir()
+        status, payload = _resolve_dialectic_ref(ref)
+        if status == 'missing':
+            return [types.TextContent(type='text', text=f'Error: dialectic "{ref}" not found')]
+        if status == 'ambiguous':
+            return [types.TextContent(type='text', text=_format_ambiguous(payload))]
+        dialectic_id = payload
         path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
-        if not os.path.exists(path):
-            return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
         try:
             with open(path) as f:
                 record = json.load(f)
@@ -862,13 +924,17 @@ async def call_tool(name: str, arguments: dict):
 
     if name == 'dialectic_resume':
         from datetime import datetime, timezone
-        dialectic_id = arguments.get('id', '').strip()
-        if not dialectic_id:
+        ref = arguments.get('id', '').strip()
+        if not ref:
             return [types.TextContent(type='text', text='Error: id is required')]
         _ensure_conversations_dir()
+        status, payload = _resolve_dialectic_ref(ref)
+        if status == 'missing':
+            return [types.TextContent(type='text', text=f'Error: dialectic "{ref}" not found')]
+        if status == 'ambiguous':
+            return [types.TextContent(type='text', text=_format_ambiguous(payload))]
+        dialectic_id = payload
         path = os.path.join(CONVERSATIONS_DIR, f'{dialectic_id}.json')
-        if not os.path.exists(path):
-            return [types.TextContent(type='text', text=f'Error: dialectic "{dialectic_id}" not found')]
         try:
             with open(path) as f:
                 record = json.load(f)
