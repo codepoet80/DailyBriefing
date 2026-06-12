@@ -8,6 +8,24 @@ ignore_user_abort(false);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
+// Capture any stray output (PHP notices/warnings) so it can't corrupt the JSON.
+ob_start();
+
+// If the worker dies (fatal error, timeout, OOM) part-way through, return JSON
+// instead of a half-streamed page.
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], array(E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR), true)) {
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        http_response_code(500);
+        echo json_encode(array(
+            'ok'    => false,
+            'error' => 'PHP ' . $err['type'] . ': ' . $err['message'],
+            'where' => basename($err['file']) . ':' . $err['line'],
+        ));
+    }
+});
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(array('ok' => false, 'error' => 'POST only'));
@@ -147,4 +165,5 @@ if (!empty($result['session_id'])) {
     ));
 }
 
+while (ob_get_level() > 0) { ob_end_clean(); }
 echo json_encode($result);

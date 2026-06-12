@@ -99,7 +99,9 @@
             var data = null;
             try { data = JSON.parse(xhr.responseText); }
             catch (e) {
-                setStatus('Server error (non-JSON response)', true);
+                var raw = xhr.responseText || '';
+                var preview = raw.length > 240 ? raw.substring(0, 240) + '…' : raw;
+                setStatus('Server error (HTTP ' + xhr.status + '): ' + preview, true);
                 return;
             }
             if (xhr.status === 401) {

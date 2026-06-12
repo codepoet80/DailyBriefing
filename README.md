@@ -18,6 +18,8 @@ Runs on macOS or Raspberry Pi. Frontend is compatible with a 2011 webOS TouchPad
 - Family calendar — full week, grouped by day
 - Tomorrow preview (afternoon run only)
 - XKCD (when a new comic is out)
+- Health metrics — weight, alcohol, exercise with 30-day sparklines and target-aware trend badges
+- Chat box — talk to the same MCP-tool surface from any device that can render basic HTML (incl. legacy browsers like the 2011 webOS TouchPad)
 
 ## Setup
 
@@ -109,6 +111,10 @@ Available resources and tools:
 | `refresh_briefing` | tool | Rebuild briefing.json on demand |
 | `add_calendar_event` | tool | Create a CalDAV event on any writable calendar |
 | `send_message` | tool | Send an iMessage/SMS via the message bridge, optionally delayed |
+| `log_weight` / `log_alcohol` / `log_exercise` | tool | Append health logs; chat agent converts natural language to standard units |
+| `get_health_summary` | tool | Live read of `data/health/*.jsonl` (fresher than briefing.json) |
+| `get_time` / `get_public_ip` | tool | System clock + outbound IP for diagnostics |
+| `dialectic_save` / `_append` / `_list` / `_get` / `_close` / `_resume` | tool | Persist and resume exploratory conversations |
 
 ### Adding calendar events
 
@@ -147,6 +153,39 @@ Delayed sends are held as asyncio tasks in the running MCP server — if the Cla
 After a `git pull` on the host machine, restart just the MCP server from within your Claude Code session (use `/mcp` to find the reconnect option) — no need to quit the session.
 
 For remote access (phone, another machine), run `claude --tunnel` on the host — it gives you a URL that connects to your local Claude Code session with MCP context attached.
+
+## Web chat
+
+A chat box at the bottom of the briefing page lets you reach the same MCP tool surface from a browser — handy when the Claude desktop/mobile app isn't an option (legacy device, kiosk, etc.). Enable in `config/config.json`:
+
+```json
+"chat_agent": {
+  "enabled": true,
+  "model": "claude-sonnet-4-6",
+  "shared_secret": "",
+  "allowed_tools": ["dialectic_save", "log_weight", "refresh_briefing", "..."]
+}
+```
+
+`allowed_tools` is a subset of the MCP server's full surface — set it to whatever you're comfortable exposing through a webpage. The chat box only renders when `enabled: true`. Leave `shared_secret` blank to skip auth (page reachability == chat reachability) or set a passphrase the browser stores in `localStorage`.
+
+Per-device sessions are persisted under `data/chat_sessions/<id>.json`; on page load the last few turns are pre-rendered so the chat doesn't feel "empty."
+
+## Health tracking
+
+Add a `health` block to `config/config.json` to enable weight / alcohol / exercise tracking with sparklines on the briefing page:
+
+```json
+"health": {
+  "weight":   { "unit": "lbs", "goal_direction": "down" },
+  "alcohol":  { "weekly_target_drinks": 15 },
+  "exercise": { "weekly_target_minutes": 150 },
+  "missed_notify_hour": 7,
+  "chart_days": 30
+}
+```
+
+Then log in plain English via the chat — "shared a bottle of wine with Nicole" or "ran 4 miles this morning" — and the agent converts to US standard drinks / minutes+intensity before appending to `data/health/*.jsonl`. Add a `health_missing` entry to `agent_rules.json` to get a Pushover reminder when a metric hasn't been logged today.
 
 ## News feeds (`config/feeds.json`)
 
