@@ -171,6 +171,16 @@ A chat box at the bottom of the briefing page lets you reach the same MCP tool s
 
 Per-device sessions are persisted under `data/chat_sessions/<id>.json`; on page load the last few turns are pre-rendered so the chat doesn't feel "empty."
 
+**If you serve behind nginx**, raise its upstream timeout — `chat.php` sets PHP's own limit to 300s, but nginx defaults to 60s and will return `504 Gateway Time-out` on long tool loops (refreshing the briefing, summarizing a large dialectic, etc.):
+
+```nginx
+# in the server block, or scoped to location = /chat.php
+fastcgi_read_timeout 300;
+fastcgi_send_timeout 300;
+```
+
+(Use `proxy_read_timeout` / `proxy_send_timeout` if your nginx proxies via `proxy_pass` rather than `fastcgi_pass`.) The same applies to other reverse proxies.
+
 ## Health tracking
 
 Add a `health` block to `config/config.json` to enable weight / alcohol / exercise tracking with sparklines on the briefing page:

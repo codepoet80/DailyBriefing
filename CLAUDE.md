@@ -339,7 +339,12 @@ When Jon asks to "resume", "continue", or "reopen" a past dialectic: call `diale
 
 To read a dialectic without re-opening it (e.g. Jon just wants to review it), call `dialectic_get` instead.
 
-**When to call `dialectic_list` / `dialectic_get`:** When Jon asks to see or review a past dialectic without continuing it.
+**When to call `dialectic_list` / `dialectic_summary` / `dialectic_get`:**
+- `dialectic_list` — browse what's there.
+- `dialectic_summary` — Jon wants a recap ("what was that about", "remind me of X", "how did Y end"). Returns first + last few turns; preferred for any summarize-style request.
+- `dialectic_get` — Jon wants the raw conversation body.
+
+**Referring to a dialectic by name:** `_get`, `_summary`, `_append`, `_close`, and `_resume` all accept a UUID, a short id prefix, OR a topic substring. Token-based fuzzy match means refs like "bottom-up top-down" find a topic like "Polanyi: bottom-up vs top-down" even though the words aren't contiguous. If the ref matches multiple topics, the tool returns a pick-list (not flagged as an error) and the agent disambiguates. Only truly-missing refs raise an error and surface in the chat log with ✗.
 
 The `briefing://dialectics` MCP resource gives a quick index of all saved dialectics.
 
