@@ -715,7 +715,7 @@ h2 {
 
 .chat-input {
     float: left;
-    width: 70%;
+    width: 80%;
     padding: 6px 8px;
     font-size: 14px;
     font-family: Arial, Helvetica, sans-serif;
@@ -725,7 +725,7 @@ h2 {
 
 .chat-send {
     float: right;
-    width: 28%;
+    width: 100px;
     padding: 6px 8px;
     font-size: 14px;
     font-family: Arial, Helvetica, sans-serif;
