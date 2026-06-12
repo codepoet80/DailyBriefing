@@ -841,13 +841,13 @@ async def call_tool(name: str, arguments: dict):
         ref = arguments.get('id', '').strip()
         turns_raw = arguments.get('turns', [])
         if not ref:
-            return [types.TextContent(type='text', text='Error: id is required')]
+            raise ValueError('id is required')
         if not turns_raw:
-            return [types.TextContent(type='text', text='Error: turns must not be empty')]
+            raise ValueError('turns must not be empty')
         _ensure_conversations_dir()
         status, payload = _resolve_dialectic_ref(ref)
         if status == 'missing':
-            return [types.TextContent(type='text', text=f'Error: dialectic "{ref}" not found')]
+            raise ValueError(f'dialectic "{ref}" not found')
         if status == 'ambiguous':
             return [types.TextContent(type='text', text=_format_ambiguous(payload))]
         dialectic_id = payload
@@ -879,11 +879,11 @@ async def call_tool(name: str, arguments: dict):
     if name == 'dialectic_get':
         ref = arguments.get('id', '').strip()
         if not ref:
-            return [types.TextContent(type='text', text='Error: id is required')]
+            raise ValueError('id is required')
         _ensure_conversations_dir()
         status, payload = _resolve_dialectic_ref(ref)
         if status == 'missing':
-            return [types.TextContent(type='text', text=f'Error: dialectic "{ref}" not found')]
+            raise ValueError(f'dialectic "{ref}" not found')
         if status == 'ambiguous':
             return [types.TextContent(type='text', text=_format_ambiguous(payload))]
         path = os.path.join(CONVERSATIONS_DIR, f'{payload}.json')
@@ -895,11 +895,11 @@ async def call_tool(name: str, arguments: dict):
         from datetime import datetime, timezone
         ref = arguments.get('id', '').strip()
         if not ref:
-            return [types.TextContent(type='text', text='Error: id is required')]
+            raise ValueError('id is required')
         _ensure_conversations_dir()
         status, payload = _resolve_dialectic_ref(ref)
         if status == 'missing':
-            return [types.TextContent(type='text', text=f'Error: dialectic "{ref}" not found')]
+            raise ValueError(f'dialectic "{ref}" not found')
         if status == 'ambiguous':
             return [types.TextContent(type='text', text=_format_ambiguous(payload))]
         dialectic_id = payload
@@ -926,11 +926,11 @@ async def call_tool(name: str, arguments: dict):
         from datetime import datetime, timezone
         ref = arguments.get('id', '').strip()
         if not ref:
-            return [types.TextContent(type='text', text='Error: id is required')]
+            raise ValueError('id is required')
         _ensure_conversations_dir()
         status, payload = _resolve_dialectic_ref(ref)
         if status == 'missing':
-            return [types.TextContent(type='text', text=f'Error: dialectic "{ref}" not found')]
+            raise ValueError(f'dialectic "{ref}" not found')
         if status == 'ambiguous':
             return [types.TextContent(type='text', text=_format_ambiguous(payload))]
         dialectic_id = payload
