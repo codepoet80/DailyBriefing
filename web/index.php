@@ -386,7 +386,11 @@ if (file_exists($_cfg_path)) {
                placeholder="Ask, save a dialectic, add a todo&hellip;">
         <button type="submit" id="chat-send" class="chat-send">Send</button>
     </form>
-    <div id="chat-status" class="chat-status"></div>
+    <div id="chat-status" class="chat-status">
+        <img id="chat-spinner" src="spinner.gif" alt="" width="16" height="16"
+             style="display:none;vertical-align:middle;margin-right:6px">
+        <span id="chat-status-text"></span>
+    </div>
 </div>
 <script type="text/javascript">
 var CHAT_NEEDS_SECRET = <?php echo $chat_needs_secret ? 'true' : 'false'; ?>;

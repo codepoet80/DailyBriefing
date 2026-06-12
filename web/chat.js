@@ -57,13 +57,20 @@
 
     function setStatus(msg, isError) {
         var s = el('chat-status');
+        var t = el('chat-status-text');
         s.className = 'chat-status' + (isError ? ' chat-status-error' : '');
-        s.innerHTML = escapeHtml(msg || '');
+        t.innerHTML = escapeHtml(msg || '');
+    }
+
+    function setSpinner(visible) {
+        var sp = el('chat-spinner');
+        if (sp) { sp.style.display = visible ? 'inline' : 'none'; }
     }
 
     function setBusy(busy) {
         el('chat-send').disabled = !!busy;
         el('chat-input').disabled = !!busy;
+        setSpinner(!!busy);
     }
 
     var CHAT_SESSION_ID = '';
