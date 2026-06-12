@@ -114,7 +114,7 @@ Available resources and tools:
 | `log_weight` / `log_alcohol` / `log_exercise` | tool | Append health logs; chat agent converts natural language to standard units |
 | `get_health_summary` | tool | Live read of `data/health/*.jsonl` (fresher than briefing.json) |
 | `get_time` / `get_public_ip` | tool | System clock + outbound IP for diagnostics |
-| `dialectic_save` / `_append` / `_list` / `_get` / `_close` / `_resume` | tool | Persist and resume exploratory conversations |
+| `dialectic_save` / `_append` / `_list` / `_get` / `_summary` / `_close` / `_resume` | tool | Persist and resume exploratory conversations (`_summary` returns a compact recap) |
 
 ### Adding calendar events
 

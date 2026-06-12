@@ -304,7 +304,7 @@ Defined in `src/mcp_server.py`. The desktop session has all of them; the web cha
 | `add_calendar_event` | Create a CalDAV event on any `writable: true` calendar |
 | `send_notification` | Push via Pushover (priority -1/0/1) |
 | `send_message` | iMessage/SMS via the message-bridge sidecar, optional `delay_minutes` |
-| `dialectic_save` / `_append` / `_list` / `_get` / `_close` / `_resume` | See Dialectics section |
+| `dialectic_save` / `_append` / `_list` / `_get` / `_summary` / `_close` / `_resume` | See Dialectics section. `_summary` returns compact recap (first + last N turns) — use for "what was that about"-style asks. |
 | `log_weight` / `log_alcohol` / `log_exercise` | Append to `data/health/*.jsonl` |
 | `get_health_summary` | Live read of `data/health/*.jsonl`, returns compact stats |
 | `get_time` | Local time + ISO + UTC |

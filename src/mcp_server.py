@@ -333,6 +333,32 @@ async def list_tools():
             },
         ),
         types.Tool(
+            name='dialectic_summary',
+            description=(
+                'Return a compact summary of a dialectic: topic, dates, status, '
+                'turn count, plus the first turn and the last few turns (default '
+                '4). Use this — NOT dialectic_get — when the user asks "what was '
+                'that about", "summarize", "remind me of the X dialectic", or '
+                'any other request that does not require the full conversation '
+                'body. Accepts a UUID, id prefix, or topic substring.'
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'id': {
+                        'type': 'string',
+                        'description': 'Dialectic UUID, short id prefix, or topic substring',
+                    },
+                    'tail_turns': {
+                        'type': 'integer',
+                        'description': 'How many trailing turns to include after the first. Default 4, max 20.',
+                        'default': 4,
+                    },
+                },
+                'required': ['id'],
+            },
+        ),
+        types.Tool(
             name='dialectic_close',
             description=(
                 'Mark a dialectic as closed. Call this when the user signals the conversation is over '
@@ -890,6 +916,46 @@ async def call_tool(name: str, arguments: dict):
         with open(path) as f:
             record = json.load(f)
         return [types.TextContent(type='text', text=json.dumps(record, indent=2))]
+
+    if name == 'dialectic_summary':
+        ref = arguments.get('id', '').strip()
+        if not ref:
+            raise ValueError('id is required')
+        try:
+            tail_turns = int(arguments.get('tail_turns', 4))
+        except (TypeError, ValueError):
+            tail_turns = 4
+        tail_turns = max(1, min(20, tail_turns))
+        _ensure_conversations_dir()
+        status, payload = _resolve_dialectic_ref(ref)
+        if status == 'missing':
+            raise ValueError(f'dialectic "{ref}" not found')
+        if status == 'ambiguous':
+            return [types.TextContent(type='text', text=_format_ambiguous(payload))]
+        path = os.path.join(CONVERSATIONS_DIR, f'{payload}.json')
+        with open(path) as f:
+            record = json.load(f)
+        turns = record.get('turns', [])
+        n = len(turns)
+        if n <= tail_turns + 1:
+            included = turns
+            elided = 0
+        else:
+            included = [turns[0]] + turns[-tail_turns:]
+            elided = n - tail_turns - 1
+        summary = {
+            'id':         record.get('id'),
+            'topic':      record.get('topic'),
+            'tags':       record.get('tags', []),
+            'status':     record.get('status', 'open'),
+            'created_at': record.get('created_at'),
+            'updated_at': record.get('updated_at'),
+            'closed_at':  record.get('closed_at'),
+            'turn_count': n,
+            'turns_elided_from_middle': elided,
+            'turns':      included,
+        }
+        return [types.TextContent(type='text', text=json.dumps(summary, indent=2))]
 
     if name == 'dialectic_close':
         from datetime import datetime, timezone

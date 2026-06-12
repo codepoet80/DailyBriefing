@@ -116,6 +116,7 @@
       "dialectic_append",
       "dialectic_list",
       "dialectic_get",
+      "dialectic_summary",
       "dialectic_close",
       "dialectic_resume",
       "add_todo",
