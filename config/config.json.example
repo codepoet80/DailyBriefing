@@ -96,6 +96,13 @@
     "pushover_device": "",
     "pushover_sound": ""
   },
+  "health": {
+    "weight":   { "unit": "lbs", "goal_direction": "down" },
+    "alcohol":  { "weekly_target_drinks": 7 },
+    "exercise": { "weekly_target_minutes": 150 },
+    "missed_notify_hour": 7,
+    "chart_days": 30
+  },
   "chat_agent": {
     "enabled": false,
     "model": "claude-sonnet-4-6",
@@ -114,7 +121,11 @@
       "add_calendar_event",
       "send_notification",
       "get_time",
-      "get_public_ip"
+      "get_public_ip",
+      "log_weight",
+      "log_alcohol",
+      "log_exercise",
+      "get_health_summary"
     ],
     "system_prompt_extra": ""
   }

@@ -41,6 +41,7 @@ $unifi           = isset($briefing['unifi'])           ? $briefing['unifi']     
 $imessage        = isset($briefing['imessage'])        ? $briefing['imessage']        : null;
 $github          = isset($briefing['github'])          ? $briefing['github']          : array();
 $reading         = isset($briefing['reading'])         ? $briefing['reading']         : null;
+$health          = isset($briefing['health'])          ? $briefing['health']          : null;
 
 $today_label   = date('l, F j, Y');
 $tomorrow_label = date('l, F j', strtotime('+1 day'));
@@ -213,6 +214,101 @@ $regular_count = count($news_regular);
         <li><?php echo h($todo['title']); ?></li>
         <?php endforeach; ?>
     </ol>
+</div>
+<?php endif; ?>
+
+<?php
+function render_sparkline($spark, $baseline_zero = false) {
+    if (!is_array($spark) || count($spark) === 0) { return ''; }
+    $nums = array();
+    foreach ($spark as $v) { if ($v !== null) { $nums[] = (float)$v; } }
+    if (!$nums) {
+        $maxv = 1.0; $minv = 0.0;
+    } else {
+        $maxv = max($nums); $minv = min($nums);
+        if ($baseline_zero) { $minv = 0.0; }
+        if ($maxv === $minv) { $maxv = $minv + 1.0; }
+    }
+    $out = '<div class="sparkline">';
+    foreach ($spark as $v) {
+        if ($v === null) {
+            $out .= '<div class="bar bar-empty" title="no data"></div>';
+        } else {
+            $pct = max(2, (int) round((($v - $minv) / ($maxv - $minv)) * 100));
+            $title = htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+            $out .= '<div class="bar" style="height:' . $pct . '%" title="' . $title . '"></div>';
+        }
+    }
+    $out .= '</div>';
+    return $out;
+}
+
+function trend_arrow($trend) {
+    if ($trend === 'good') return '<span class="trend trend-good" title="trending in the right direction">&uarr;&darr;</span>';
+    if ($trend === 'bad')  return '<span class="trend trend-bad" title="trending the wrong way">!</span>';
+    return '<span class="trend trend-flat" title="flat">&ndash;</span>';
+}
+?>
+<?php if ($health): ?>
+<?php
+    $hw = isset($health['weight'])   ? $health['weight']   : array();
+    $ha = isset($health['alcohol'])  ? $health['alcohol']  : array();
+    $he = isset($health['exercise']) ? $health['exercise'] : array();
+?>
+<div class="section section-health">
+    <h2>Health</h2>
+
+    <div class="health-row">
+        <div class="health-label">
+            Weight
+            <?php if (empty($hw['today_logged'])): ?><span class="health-missing">log&hellip;</span><?php endif; ?>
+        </div>
+        <div class="health-value">
+            <?php if ($hw['latest'] !== null): ?>
+                <?php echo h(number_format((float)$hw['latest'], 1)); ?> <?php echo h($hw['unit']); ?>
+                <span class="health-sub">on <?php echo h($hw['latest_date']); ?></span>
+            <?php else: ?>
+                <span class="health-sub">no logs yet</span>
+            <?php endif; ?>
+            <?php
+                $trend = isset($hw['trend']) ? $hw['trend'] : 'flat';
+                echo trend_arrow($trend);
+            ?>
+        </div>
+        <?php echo render_sparkline(isset($hw['sparkline']) ? $hw['sparkline'] : array(), false); ?>
+    </div>
+
+    <div class="health-row">
+        <div class="health-label">
+            Alcohol
+            <?php if (empty($ha['today_logged'])): ?><span class="health-sub">(no log today)</span><?php endif; ?>
+        </div>
+        <div class="health-value">
+            <?php echo h((string)$ha['today_drinks']); ?> today &middot;
+            <?php echo h((string)$ha['week_drinks']); ?> this week
+            <?php if (!empty($ha['weekly_target'])): ?>
+                <span class="health-sub">/ <?php echo h((string)$ha['weekly_target']); ?> target</span>
+            <?php endif; ?>
+            <?php echo trend_arrow(isset($ha['trend']) ? $ha['trend'] : 'flat'); ?>
+        </div>
+        <?php echo render_sparkline(isset($ha['sparkline']) ? $ha['sparkline'] : array(), true); ?>
+    </div>
+
+    <div class="health-row">
+        <div class="health-label">
+            Exercise
+            <?php if (empty($he['today_logged'])): ?><span class="health-sub">(no log today)</span><?php endif; ?>
+        </div>
+        <div class="health-value">
+            <?php echo (int)$he['today_minutes']; ?> min today &middot;
+            <?php echo (int)$he['week_minutes']; ?> min this week
+            <?php if (!empty($he['weekly_target'])): ?>
+                <span class="health-sub">/ <?php echo (int)$he['weekly_target']; ?> target</span>
+            <?php endif; ?>
+            <?php echo trend_arrow(isset($he['trend']) ? $he['trend'] : 'flat'); ?>
+        </div>
+        <?php echo render_sparkline(isset($he['sparkline']) ? $he['sparkline'] : array(), true); ?>
+    </div>
 </div>
 <?php endif; ?>
 

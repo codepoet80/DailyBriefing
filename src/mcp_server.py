@@ -348,6 +348,106 @@ async def list_tools():
             },
         ),
         types.Tool(
+            name='log_weight',
+            description=(
+                'Log a weight measurement. The chat agent should ask the user for '
+                'their weight in pounds and pass it as a number. If the user gives '
+                'a date other than today (e.g. "yesterday morning"), include date '
+                'as YYYY-MM-DD.'
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'pounds': {
+                        'type': 'number',
+                        'description': 'Weight in pounds (lbs).',
+                    },
+                    'date': {
+                        'type': 'string',
+                        'description': 'Optional ISO date YYYY-MM-DD. Defaults to today.',
+                    },
+                    'note': {'type': 'string', 'description': 'Optional free-text note.'},
+                },
+                'required': ['pounds'],
+            },
+        ),
+        types.Tool(
+            name='log_alcohol',
+            description=(
+                'Log an alcohol consumption episode. The chat agent converts the '
+                "user's natural-language description into US standard drinks "
+                '(1 drink = 14g pure ethanol = 5oz wine = 12oz 5% beer = 1.5oz '
+                'spirit) and passes the count. ALWAYS include the original raw '
+                'description so the user can review it later.'
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'drinks': {
+                        'type': 'number',
+                        'description': 'Total US standard drinks consumed in this episode.',
+                    },
+                    'raw_input': {
+                        'type': 'string',
+                        'description': "The user's original natural-language description.",
+                    },
+                    'items': {
+                        'type': 'array',
+                        'description': 'Optional itemization, e.g. [{"kind":"wine","count":2.5}]',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'kind':  {'type': 'string'},
+                                'count': {'type': 'number'},
+                            },
+                        },
+                    },
+                    'date': {
+                        'type': 'string',
+                        'description': 'Optional ISO date YYYY-MM-DD. Defaults to today.',
+                    },
+                },
+                'required': ['drinks', 'raw_input'],
+            },
+        ),
+        types.Tool(
+            name='log_exercise',
+            description=(
+                'Log an exercise session. The chat agent extracts duration in '
+                'minutes and intensity ("light"/"moderate"/"vigorous") from the '
+                "user's description. ALWAYS include raw_input."
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'minutes':   {'type': 'number',  'description': 'Duration in minutes.'},
+                    'intensity': {
+                        'type': 'string',
+                        'enum': ['light', 'moderate', 'vigorous'],
+                        'description': 'Perceived intensity.',
+                    },
+                    'kind':      {'type': 'string', 'description': 'Free-text kind (e.g. "run", "yoga").'},
+                    'raw_input': {'type': 'string', 'description': "User's original description."},
+                    'date': {
+                        'type': 'string',
+                        'description': 'Optional ISO date YYYY-MM-DD. Defaults to today.',
+                    },
+                },
+                'required': ['minutes', 'intensity', 'raw_input'],
+            },
+        ),
+        types.Tool(
+            name='get_health_summary',
+            description=(
+                'Return fresh health-metric status (weight, alcohol, exercise) from '
+                'the JSONL log files: latest values, today_logged status, 7- and '
+                '30-day totals, and trend direction. Use this when the user asks '
+                'how they are doing on a metric instead of relying on the briefing '
+                'snapshot, which may be stale.'
+            ),
+            inputSchema={'type': 'object', 'properties': {}},
+        ),
+        types.Tool(
             name='get_time',
             description=(
                 "Get the current local date and time on the briefing server. "
@@ -794,6 +894,76 @@ async def call_tool(name: str, arguments: dict):
             reply += f'\n\nDialectic stance for this session: {dialectic_prompt}'
         reply += f'\n\nPrior conversation:\n{json.dumps(record, indent=2)}'
         return [types.TextContent(type='text', text=reply)]
+
+    if name in ('log_weight', 'log_alcohol', 'log_exercise'):
+        from datetime import datetime, timezone
+        health_dir = os.path.join(DATA_DIR, 'health')
+        os.makedirs(health_dir, exist_ok=True)
+        now = datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+        local_date = arguments.get('date') or datetime.now().strftime('%Y-%m-%d')
+        try:
+            datetime.strptime(local_date, '%Y-%m-%d')
+        except ValueError:
+            return [types.TextContent(type='text', text=f'Error: invalid date "{local_date}", expected YYYY-MM-DD')]
+
+        if name == 'log_weight':
+            try:
+                pounds = float(arguments['pounds'])
+            except (KeyError, TypeError, ValueError):
+                return [types.TextContent(type='text', text='Error: pounds must be a number')]
+            if pounds <= 0 or pounds > 1000:
+                return [types.TextContent(type='text', text='Error: pounds out of range')]
+            entry = {
+                'ts': now, 'date': local_date, 'pounds': round(pounds, 1),
+                'note': arguments.get('note', ''),
+            }
+            path = os.path.join(health_dir, 'weight.jsonl')
+            reply = f'Logged weight: {entry["pounds"]} lbs on {local_date}.'
+        elif name == 'log_alcohol':
+            try:
+                drinks = float(arguments['drinks'])
+            except (KeyError, TypeError, ValueError):
+                return [types.TextContent(type='text', text='Error: drinks must be a number')]
+            if drinks < 0 or drinks > 50:
+                return [types.TextContent(type='text', text='Error: drinks out of range')]
+            entry = {
+                'ts': now, 'date': local_date,
+                'drinks': round(drinks, 2),
+                'raw_input': arguments.get('raw_input', '').strip(),
+                'items': arguments.get('items', []),
+            }
+            path = os.path.join(health_dir, 'alcohol.jsonl')
+            reply = f'Logged {entry["drinks"]} standard drink(s) on {local_date}: {entry["raw_input"]}'
+        else:  # log_exercise
+            try:
+                minutes = float(arguments['minutes'])
+            except (KeyError, TypeError, ValueError):
+                return [types.TextContent(type='text', text='Error: minutes must be a number')]
+            intensity = arguments.get('intensity', '')
+            if intensity not in ('light', 'moderate', 'vigorous'):
+                return [types.TextContent(type='text', text='Error: intensity must be light/moderate/vigorous')]
+            if minutes <= 0 or minutes > 1440:
+                return [types.TextContent(type='text', text='Error: minutes out of range')]
+            entry = {
+                'ts': now, 'date': local_date,
+                'minutes': int(round(minutes)),
+                'intensity': intensity,
+                'kind': arguments.get('kind', ''),
+                'raw_input': arguments.get('raw_input', '').strip(),
+            }
+            path = os.path.join(health_dir, 'exercise.jsonl')
+            reply = (f'Logged {entry["minutes"]} min of {intensity} '
+                     f'{entry["kind"] or "exercise"} on {local_date}.')
+
+        with open(path, 'a') as f:
+            f.write(json.dumps(entry) + '\n')
+        return [types.TextContent(type='text', text=reply)]
+
+    if name == 'get_health_summary':
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from fetch_health import fetch_health  # type: ignore
+        summary = fetch_health(config, compact=True)
+        return [types.TextContent(type='text', text=json.dumps(summary, indent=2))]
 
     if name == 'get_time':
         from datetime import datetime, timezone

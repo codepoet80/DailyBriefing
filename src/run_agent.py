@@ -194,6 +194,25 @@ def evaluate_rules(briefing, rules):
                     'summary': f"GitHub {n.get('type')} [{n.get('reason')}]: {n.get('title')} ({n.get('repo')})",
                 })
 
+        elif rule_type == 'health_missing':
+            not_before = rule.get('not_before_hour')
+            if not_before is not None and now.hour < int(not_before):
+                continue
+            metrics = rule.get('metrics') or ['weight', 'alcohol', 'exercise']
+            health = briefing.get('health') or {}
+            today_str = now.strftime('%Y-%m-%d')
+            for metric in metrics:
+                data = health.get(metric)
+                if not data:
+                    continue
+                if not data.get('today_logged'):
+                    candidates.append({
+                        'rule': rule,
+                        'item_key': f'health_missing:{metric}:{today_str}',
+                        'data': {'metric': metric, 'health': data},
+                        'summary': f'No {metric} logged today',
+                    })
+
         elif rule_type == 'weather':
             weather = briefing.get('weather', {})
             if not weather:

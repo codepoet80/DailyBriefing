@@ -23,6 +23,7 @@ from fetch_unifi import fetch_unifi
 from fetch_imessage import fetch_imessage
 from fetch_github import fetch_github
 from fetch_reading import fetch_reading
+from fetch_health import fetch_health
 
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -121,6 +122,9 @@ def main():
     print('  Fetching reading progress...')
     reading = fetch_reading(config)
 
+    print('  Reading health logs...')
+    health = fetch_health(config)
+
     briefing = {
         'generated_at': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
         'run_type': run_type,
@@ -140,6 +144,7 @@ def main():
         'imessage': imessage,
         'github': github,
         'reading': reading,
+        'health': health,
     }
 
     output_path = os.path.join(DATA_DIR, 'briefing.json')

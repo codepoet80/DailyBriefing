@@ -71,6 +71,15 @@
       "conditions": ["rain", "snow", "storm", "severe", "thunderstorm"],
       "pushover_priority": 0,
       "dedupe_hours": 12
+    },
+    {
+      "id": "health_missing_morning",
+      "type": "health_missing",
+      "enabled": true,
+      "metrics": ["weight", "alcohol", "exercise"],
+      "not_before_hour": 7,
+      "pushover_priority": -1,
+      "dedupe_hours": 24
     }
   ]
 }
