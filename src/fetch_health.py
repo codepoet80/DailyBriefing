@@ -43,6 +43,14 @@ def _day_range(days):
     return [today - timedelta(days=days - 1 - i) for i in range(days)]
 
 
+def _week_dates():
+    """Dates for the current calendar week, Sunday through Saturday."""
+    today = date.today()
+    # weekday(): Mon=0 .. Sun=6; days since the most recent Sunday.
+    start = today - timedelta(days=(today.weekday() + 1) % 7)
+    return [start + timedelta(days=i) for i in range(7)]
+
+
 def _weight_slope_trend(sparkline, goal_direction='down'):
     """Compare recent 3 weight logs to the prior 3. Skip if not enough data."""
     vals = [v for v in sparkline if v is not None]
@@ -134,7 +142,7 @@ def _alcohol_summary(cfg, days):
         spark = [None] * days
 
     today_drinks = by_day.get(today_iso, 0)
-    week_dates = [d.isoformat() for d in _day_range(7)]
+    week_dates = [d.isoformat() for d in _week_dates()]
     week_drinks = round(sum(by_day.get(d, 0) for d in week_dates), 2)
 
     raw_today = [r.get('raw_input', '') for r in rows if r.get('date') == today_iso]
@@ -160,7 +168,7 @@ def _exercise_summary(cfg, days):
         spark = [None] * days
 
     today_minutes = int(by_day.get(today_iso, 0))
-    week_dates = [d.isoformat() for d in _day_range(7)]
+    week_dates = [d.isoformat() for d in _week_dates()]
     week_minutes = int(sum(by_day.get(d, 0) for d in week_dates))
 
     last_kind = ''
