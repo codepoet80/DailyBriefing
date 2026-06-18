@@ -272,7 +272,9 @@ The chat agent converts natural language into structured values **in-conversatio
 
 ### Aggregation (`fetch_health.py`)
 
-Called from `build_briefing.py`. Produces per-metric: `latest`, `today_logged`, 30-day `sparkline` (list of numbers or `null` for "no log"), and `trend` (`good`/`bad`/`flat`).
+Called from `build_briefing.py`. Produces per-metric: `latest`, `today_logged`, weekly total (`week_drinks` / `week_minutes`), 30-day `sparkline` (list of numbers or `null` for "no log"), and `trend` (`good`/`bad`/`flat`).
+
+**Weekly totals use a Sunday–Saturday calendar week** (`_week_dates()` in `fetch_health.py`), not a rolling 7-day window — a workout on Saturday counts toward that week; Sunday starts a fresh one. The 30-day sparkline still uses a rolling window (`_day_range`).
 
 Trend logic:
 - **Weight** — slope-based. Compares last 3 logs to prior 3. Threshold: 0.5% of prior avg or 0.3 lb (whichever bigger). Requires ≥4 data points.
@@ -288,6 +290,8 @@ The target-based design for alcohol/exercise is intentional: slope alone mislead
 ### Fresh-data query
 
 `get_health_summary` MCP tool reads the JSONL files directly (skipping `briefing.json`), so when the user asks "how am I doing on drinking?" right after logging, they get up-to-the-minute numbers instead of the cron snapshot.
+
+**Reload caveat:** the MCP server is a long-running process that imports `fetch_health` (and other modules) once and caches them. After editing `fetch_health.py` or any server module, **reload the MCP server** (`/mcp` reconnect) before `get_health_summary` reflects the change. `refresh_briefing` / `build_briefing.py` always spawn a fresh process, so the *briefing* picks up code changes immediately while the live tool lags until reload.
 
 ### UI
 
@@ -347,6 +351,27 @@ To read a dialectic without re-opening it (e.g. Jon just wants to review it), ca
 **Referring to a dialectic by name:** `_get`, `_summary`, `_append`, `_close`, and `_resume` all accept a UUID, a short id prefix, OR a topic substring. Token-based fuzzy match means refs like "bottom-up top-down" find a topic like "Polanyi: bottom-up vs top-down" even though the words aren't contiguous. If the ref matches multiple topics, the tool returns a pick-list (not flagged as an error) and the agent disambiguates. Only truly-missing refs raise an error and surface in the chat log with ✗.
 
 The `briefing://dialectics` MCP resource gives a quick index of all saved dialectics.
+
+## Notification Agent (`run_agent.py` + `config/agent_rules.json`)
+
+Runs after every build (via `run.sh`, so hourly 6am–9pm). Evaluates `config/agent_rules.json` against the freshly written `briefing.json`, generates concise notification text with the Claude API (`agent.model`, default Haiku; falls back to the rule's `summary` on API error), and sends via Pushover. State (dedupe + priority-1 receipts) lives in `data/agent_state.json` via `agent_memory.py`.
+
+Each rule shares: `id`, `type`, `enabled`, `pushover_priority` (-1/0/1), `dedupe_hours` (suppress re-fire within window; keyed on rule id + a per-item key). Rule types and their type-specific fields:
+
+| `type` | Fires when | Key fields |
+|---|---|---|
+| `calendar` | a "mine" event title matches a keyword within the window | `keywords`, `window_minutes` |
+| `family_calendar` | family events today | — |
+| `server_status` | any monitored server is down | — |
+| `security` | overnight Unifi smart-detection of given types | `event_types` |
+| `news_keyword` | a news headline matches | `keywords` |
+| `reading` | reading reminder | — |
+| `todos` | morning todo digest at a set hour | `hour`, `max_count` |
+| `github` | GitHub notifications of given reasons | `reasons` |
+| `weather` | today's `condition` *substring*-matches any listed term | `conditions` |
+| `health_missing` | a metric isn't logged today (after `not_before_hour`) | `metrics`, `not_before_hour` |
+
+Gotcha: `weather.conditions` is a plain substring match on the day's condition string, so `"rain"` matches "Light rain" and fires on nearly any wet day. Keep the list narrow (e.g. `storm`/`severe`/`thunderstorm`) for true alerts only.
 
 ## Known Issues / Future Ideas
 
