@@ -1099,7 +1099,14 @@ async def call_tool(name: str, arguments: dict):
             reply = (f'Logged {entry["minutes"]} min of {intensity} '
                      f'{entry["kind"] or "exercise"} on {local_date}.')
 
-        with open(path, 'a') as f:
+        with open(path, 'a+') as f:
+            # Guard against a prior record that wasn't newline-terminated
+            # (e.g. hand-edited file). Without this, two JSON objects collide
+            # on one physical line and the line-based JSONL reader drops both.
+            if f.tell() > 0:
+                f.seek(f.tell() - 1)
+                if f.read(1) != '\n':
+                    f.write('\n')
             f.write(json.dumps(entry) + '\n')
         return [types.TextContent(type='text', text=reply)]
 
