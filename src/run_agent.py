@@ -164,21 +164,30 @@ def evaluate_rules(briefing, rules):
                 })
 
         elif rule_type == 'reading':
+            trigger_hour = rule.get('hour')
+            if trigger_hour is not None and now.hour != trigger_hour:
+                continue
             reading = briefing.get('reading') or {}
-            stagnant = reading.get('stagnant', [])
-            if stagnant:
-                today_str = now.strftime('%Y-%m-%d')
-                titles = [b['title'] for b in stagnant]
-                longest_gap = stagnant[-1]['days_since']
-                candidates.append({
-                    'rule': rule,
-                    'item_key': f'reading:stagnant:{today_str}',
-                    'data': {'stagnant': stagnant},
-                    'summary': (
-                        f"{len(stagnant)} book(s) unread for {longest_gap}+ days: "
-                        + ', '.join(titles)
-                    ),
-                })
+            books = reading.get('books', [])
+            if not books:
+                continue
+            # Only nag when NOTHING has progressed recently. If any single book
+            # was read within `stale_days`, stay quiet. The stable item_key plus
+            # dedupe_hours (72) paces re-nags to once every 3 days.
+            stale_days = rule.get('stale_days', 3)
+            min_days_since = min(b['days_since'] for b in books)
+            if min_days_since < stale_days:
+                continue
+            titles = [b['title'] for b in books]
+            candidates.append({
+                'rule': rule,
+                'item_key': 'reading:no_progress',
+                'data': {'books': books, 'days_since': min_days_since},
+                'summary': (
+                    f"No reading in {min_days_since} days across "
+                    f"{len(books)} book(s): " + ', '.join(titles)
+                ),
+            })
 
         elif rule_type == 'github':
             notifications = briefing.get('github') or []
@@ -271,6 +280,17 @@ def write_notification_texts(candidates, config):
     return {t['id']: t for t in json.loads(text)}
 
 
+def digest_title(now, count):
+    """Time-of-day label for a batched digest push."""
+    if now.hour < 12:
+        label = 'Morning briefing'
+    elif now.hour < 17:
+        label = 'Afternoon briefing'
+    else:
+        label = 'Evening briefing'
+    return f'{label} ({count})'
+
+
 def send_pushover(app_token, user_key, title, message, priority=0, device='', sound=''):
     payload = {
         'token': app_token,
@@ -346,21 +366,55 @@ def main():
             for i, (c, _) in enumerate(to_notify)
         }
 
+    device = agent_cfg.get('pushover_device', '')
+    sound = agent_cfg.get('pushover_sound', '')
+
+    # Split out emergencies (priority >= 1) so urgent alerts keep their own push,
+    # retry/expire, and receipt. Everything else this run is batched into a single
+    # digest push so a morning's worth of low-priority items arrives as one summary.
+    emergencies, regular = [], []
     for i, (candidate, hash_key) in enumerate(to_notify):
         text = text_map.get(i, {})
-        title = text.get('title', candidate['rule']['type'])
-        message = text.get('message', candidate['summary'])
-        priority = candidate['rule'].get('pushover_priority', 0)
+        item = {
+            'candidate': candidate,
+            'hash_key': hash_key,
+            'title': text.get('title', candidate['rule']['type']),
+            'message': text.get('message', candidate['summary']),
+            'priority': candidate['rule'].get('pushover_priority', 0),
+        }
+        (emergencies if item['priority'] >= 1 else regular).append(item)
 
+    def record(item, receipt):
+        c = item['candidate']
+        memory.record_push(item['hash_key'], c['rule']['id'], c['summary'], receipt)
+        memory.increment_stat(c['rule']['id'], 'fired')
+
+    def send_single(item):
         try:
-            receipt = send_pushover(app_token, user_key, title, message, priority,
-                                    device=agent_cfg.get('pushover_device', ''),
-                                    sound=agent_cfg.get('pushover_sound', ''))
-            memory.record_push(hash_key, candidate['rule']['id'], candidate['summary'], receipt)
-            memory.increment_stat(candidate['rule']['id'], 'fired')
-            print(f'  Pushed [{candidate["rule"]["id"]}]: {title}')
+            receipt = send_pushover(app_token, user_key, item['title'], item['message'],
+                                    item['priority'], device=device, sound=sound)
+            record(item, receipt)
+            print(f'  Pushed [{item["candidate"]["rule"]["id"]}]: {item["title"]}')
         except Exception as e:
-            print(f'  Pushover error [{candidate["rule"]["id"]}]: {e}')
+            print(f'  Pushover error [{item["candidate"]["rule"]["id"]}]: {e}')
+
+    for item in emergencies:
+        send_single(item)
+
+    if len(regular) == 1:
+        send_single(regular[0])
+    elif regular:
+        title = digest_title(datetime.now(), len(regular))
+        body = '\n'.join(f"• {it['title']}: {it['message']}" for it in regular)[:1024]
+        priority = max(it['priority'] for it in regular)
+        try:
+            send_pushover(app_token, user_key, title, body, priority,
+                          device=device, sound=sound)
+            for it in regular:
+                record(it, None)
+            print(f'  Pushed digest ({len(regular)} items): {title}')
+        except Exception as e:
+            print(f'  Pushover error (digest): {e}')
 
     memory.prune()
     memory.save()

@@ -10,12 +10,18 @@ A self-hosted morning dashboard that aggregates calendars, news, todos, Geek New
 
 ### Cron schedule (`crontab -e`)
 ```
-30 6  * * * /path/to/daily-briefing/run.sh
-30 11 * * * /path/to/daily-briefing/run.sh
-30 16 * * * /path/to/daily-briefing/run.sh
-30 19 * * * /path/to/daily-briefing/run.sh
+0 * * * * /path/to/daily-briefing/run.sh
 ```
-The afternoon run (16:30) and evening run (19:30) both include tomorrow's calendar preview. The evening run omits today's schedule, More News, and XKCD.
+`run.sh` runs **hourly**; each run rebuilds `briefing.json` and then fires the notification agent. Content varies by time-of-day bucket, derived from the run's hour in `determine_run_type()`:
+
+| Bucket | Hours | Notable content |
+|---|---|---|
+| `morning` | `< 10` | full briefing |
+| `midday` | `10–13` | full briefing |
+| `afternoon` | `14–18` | adds tomorrow's calendar preview |
+| `evening` | `19+` | adds tomorrow's preview; omits today's schedule, More News, and XKCD |
+
+(Sunday from 10:00 on also includes tomorrow's preview.) Time-gated agent rules — e.g. `todos` and `reading` (`hour: 9`) — fire on the run whose hour matches.
 
 ### Dev server
 ```bash
@@ -196,7 +202,7 @@ Uses [Open-Meteo](https://open-meteo.com/) — no API key required. Returns curr
 
 ## XKCD State (`fetch_xkcd.py`)
 
-`data/xkcd_state.json` persists the last-seen comic number. The state file is only updated when the comic is **not** new, so a new comic stays visible across all three daily runs until the next one publishes.
+`data/xkcd_state.json` persists the last-seen comic number. The state file is only updated when the comic is **not** new, so a new comic stays visible across the day's runs until the next one publishes.
 
 ## UI Sections (top to bottom)
 
@@ -220,7 +226,7 @@ Combines HackerNews (Firebase API, parallel fetch) and Slashdot (RSS, `geek_only
 
 ## Greeting (`fetch_greeting.py`)
 
-Time-of-day salutation (Good morning/afternoon/evening) using the name from `greeting.name` in config. Daily inspirational quote from [ZenQuotes](https://zenquotes.io/) `/api/today` endpoint — same quote across all three runs.
+Time-of-day salutation (Good morning/afternoon/evening) using the name from `greeting.name` in config. Daily inspirational quote from [ZenQuotes](https://zenquotes.io/) `/api/today` endpoint — same quote across all of the day's runs.
 
 ## Unifi Security (`fetch_unifi.py`)
 
@@ -354,7 +360,7 @@ The `briefing://dialectics` MCP resource gives a quick index of all saved dialec
 
 ## Notification Agent (`run_agent.py` + `config/agent_rules.json`)
 
-Runs after every build (via `run.sh`, so hourly 6am–9pm). Evaluates `config/agent_rules.json` against the freshly written `briefing.json`, generates concise notification text with the Claude API (`agent.model`, default Haiku; falls back to the rule's `summary` on API error), and sends via Pushover. State (dedupe + priority-1 receipts) lives in `data/agent_state.json` via `agent_memory.py`.
+Runs after every build (via `run.sh`, so hourly). Evaluates `config/agent_rules.json` against the freshly written `briefing.json`, generates concise notification text with the Claude API (`agent.model`, default Haiku; falls back to the rule's `summary` on API error), and sends via Pushover. State (dedupe + priority-1 receipts) lives in `data/agent_state.json` via `agent_memory.py`.
 
 Each rule shares: `id`, `type`, `enabled`, `pushover_priority` (-1/0/1), `dedupe_hours` (suppress re-fire within window; keyed on rule id + a per-item key). Rule types and their type-specific fields:
 
@@ -365,13 +371,19 @@ Each rule shares: `id`, `type`, `enabled`, `pushover_priority` (-1/0/1), `dedupe
 | `server_status` | any monitored server is down | — |
 | `security` | overnight Unifi smart-detection of given types | `event_types` |
 | `news_keyword` | a news headline matches | `keywords` |
-| `reading` | reading reminder | — |
+| `reading` | no book progressed within `stale_days` (default 3); gated to `hour` | `hour`, `stale_days` |
 | `todos` | morning todo digest at a set hour | `hour`, `max_count` |
 | `github` | GitHub notifications of given reasons | `reasons` |
 | `weather` | today's `condition` *substring*-matches any listed term | `conditions` |
 | `health_missing` | a metric isn't logged today (after `not_before_hour`) | `metrics`, `not_before_hour` |
 
 Gotcha: `weather.conditions` is a plain substring match on the day's condition string, so `"rain"` matches "Light rain" and fires on nearly any wet day. Keep the list narrow (e.g. `storm`/`severe`/`thunderstorm`) for true alerts only.
+
+### Batched pushes
+
+Within a single agent run, low-priority notifications (Pushover priority ≤ 0) are **combined into one digest push** (`digest_title()` gives a time-of-day label like "Morning briefing (3)", body is one `• title: message` line per item) instead of one push per rule. Because each cron run is its own process, the 6am run yields one morning digest and the 9am run another. Emergencies (priority ≥ 1, e.g. `server_status`) are sent individually so they keep their own alert sound, retry/expire, and receipt — they are never folded into the digest.
+
+The `reading` rule is gated to `hour: 9`, so its reminder lands in the 9am digest. It only fires when *no* tracked book has progressed within `stale_days` (any single book read more recently silences it), and its stable `item_key` (`reading:no_progress`) plus `dedupe_hours: 72` paces re-nags to once every 3 days.
 
 ## Known Issues / Future Ideas
 

@@ -43,8 +43,10 @@
       "id": "reading_reminder",
       "type": "reading",
       "enabled": true,
+      "hour": 9,
+      "stale_days": 3,
       "pushover_priority": -1,
-      "dedupe_hours": 24
+      "dedupe_hours": 72
     },
     {
       "id": "todos_morning",
