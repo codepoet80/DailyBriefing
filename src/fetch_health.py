@@ -116,6 +116,8 @@ def _weight_summary(cfg, days):
         'sparkline': spark,
         'trend': _weight_slope_trend(spark, cfg.get('weight', {}).get('goal_direction', 'down')),
         'unit': cfg.get('weight', {}).get('unit', 'lbs'),
+        'target': cfg.get('weight', {}).get('target'),
+        'chart_pad': cfg.get('weight', {}).get('chart_pad', 10),
     }
 
 

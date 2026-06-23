@@ -1,0 +1,775 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #222;
+    background: #e8e8e4;
+    padding: 10px;
+}
+
+a {
+    color: #1a4a7a;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.section {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 14px 16px;
+    margin: 0 auto 10px auto;
+    max-width: 860px;
+}
+
+h2 {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #666;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+
+/* ---- Greeting ---- */
+.section-greeting {
+    text-align: center;
+    padding: 18px 24px 14px;
+}
+
+.greeting-text {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 22px;
+    font-weight: bold;
+    color: #222;
+    margin-bottom: 10px;
+}
+
+.greeting-quote {
+    font-size: 14px;
+    font-style: italic;
+    color: #555;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.greeting-author {
+    display: block;
+    font-size: 12px;
+    font-style: normal;
+    color: #999;
+    font-family: Arial, Helvetica, sans-serif;
+    margin-top: 4px;
+}
+
+/* ---- Server Status ---- */
+.section-servers {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 8px 16px;
+    border-radius: 0;
+}
+
+.servers-up {
+    background: #eaf6ee;
+    border-color: #7bc89a;
+    color: #2a6b45;
+}
+
+.servers-down {
+    background: #fef9e7;
+    border-color: #f0c040;
+    color: #7a5800;
+}
+
+.servers-icon {
+    font-size: 14px;
+    margin-right: 5px;
+}
+
+.servers-site {
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+/* ---- Podcast ---- */
+.section-podcast {
+    background: #1a1a1a;
+    border-color: #333;
+    padding: 10px 16px;
+    display: table;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.podcast-btn {
+    display: inline-block;
+    background: #2e7d6e;
+    color: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 6px 14px;
+    text-decoration: none;
+    vertical-align: middle;
+    margin-right: 12px;
+}
+
+.podcast-btn:hover {
+    background: #235f53;
+    text-decoration: none;
+}
+
+.podcast-title {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    color: #aaa;
+    vertical-align: middle;
+}
+
+/* ---- Verse of the Day ---- */
+.verse-section {
+    background: #1b3a5c;
+    border-color: #0d2438;
+    text-align: center;
+    padding: 10px 24px;
+}
+
+.verse-label {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #7aaed4;
+    margin-bottom: 6px;
+}
+
+.verse-text {
+    font-size: 18px;
+    font-style: italic;
+    color: #ddeeff;
+    line-height: 1.65;
+    margin: 0 0 6px 0;
+    padding: 0;
+    border: none;
+}
+
+.verse-ref {
+    font-size: 13px;
+    color: #7aaed4;
+}
+
+/* ---- Calendar ---- */
+.calendar-list {
+    list-style: none;
+    padding: 0;
+}
+
+.calendar-list li {
+    padding: 5px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 15px;
+}
+
+.calendar-list li:last-child {
+    border-bottom: none;
+}
+
+.event-time {
+    display: inline-block;
+    width: 85px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #1a4a7a;
+}
+
+.event-title {
+    font-size: 15px;
+}
+
+.event-location {
+    font-size: 12px;
+    color: #888;
+}
+
+.event-cal {
+    font-size: 11px;
+    color: #bbb;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.empty {
+    font-style: italic;
+    color: #aaa;
+    font-size: 14px;
+}
+
+/* ---- Important News ---- */
+.story-card {
+    border-left: 4px solid #4e86c3;
+    background: #f4f7fa;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+
+.story-card:last-child {
+    margin-bottom: 0;
+}
+
+.story-title {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.story-title a {
+    color: #1a4a7a;
+}
+
+.story-summary {
+    font-size: 13px;
+    color: #444;
+    line-height: 1.4;
+    margin-bottom: 5px;
+}
+
+.story-sources {
+    font-size: 11px;
+    color: #999;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ---- Weather ---- */
+.wx-today {
+    margin-bottom: 10px;
+}
+
+.wx-temp {
+    font-size: 32px;
+    font-weight: bold;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #2a6096;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.wx-condition {
+    font-size: 18px;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #444;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+.wx-meta {
+    display: block;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    color: #777;
+    margin-top: 4px;
+}
+
+.wx-forecast {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.wx-forecast tr {
+    border-top: 1px solid #f0f0f0;
+}
+
+.wx-forecast td {
+    padding: 4px 6px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+}
+
+.wx-day {
+    font-weight: bold;
+    color: #444;
+    width: 90px;
+}
+
+.wx-fc-condition {
+    color: #555;
+}
+
+.wx-fc-temp {
+    color: #2a6096;
+    white-space: nowrap;
+    text-align: right;
+    width: 100px;
+}
+
+.wx-fc-precip {
+    color: #777;
+    text-align: right;
+    width: 60px;
+}
+
+/* ---- Todos ---- */
+.todo-list {
+    padding-left: 22px;
+}
+
+.todo-list li {
+    padding: 4px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 15px;
+}
+
+.todo-list li:last-child {
+    border-bottom: none;
+}
+
+/* ---- Expander (shared by collapsible sections) ---- */
+.expander {
+    cursor: pointer;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #666;
+}
+
+.expander-open {
+    color: #333;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+
+.expander:hover {
+    color: #1a4a7a;
+}
+
+.news-list {
+    list-style: none;
+    padding: 0;
+    margin-top: 8px;
+}
+
+.news-list li {
+    padding: 4px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 14px;
+}
+
+.news-list li:last-child {
+    border-bottom: none;
+}
+
+.source-tag {
+    font-size: 10px;
+    color: #999;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f0f0f0;
+    padding: 1px 4px;
+    margin-left: 5px;
+}
+
+/* ---- Hacker News ---- */
+.hn-list {
+    padding-left: 22px;
+}
+
+.hn-list li {
+    padding: 4px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 14px;
+}
+
+.hn-list li:last-child {
+    border-bottom: none;
+}
+
+.hn-meta {
+    font-size: 11px;
+    color: #aaa;
+    font-family: Arial, Helvetica, sans-serif;
+    margin-left: 6px;
+}
+
+/* ---- XKCD ---- */
+.xkcd-img {
+    display: block;
+    max-width: 100%;
+    margin: 10px auto;
+}
+
+.xkcd-alt {
+    font-size: 13px;
+    font-style: italic;
+    color: #666;
+}
+
+/* ---- Family Calendar ---- */
+.section-family {
+    background: #f8f8f8;
+    border-color: #ddd;
+}
+
+.section-family h2 {
+    border-color: #e0e0e0;
+}
+
+.family-day {
+    margin-bottom: 10px;
+}
+
+.family-day:last-child {
+    margin-bottom: 0;
+}
+
+.family-day-label {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 3px;
+}
+
+.today-badge {
+    font-size: 10px;
+    background: #c0392b;
+    color: #fff;
+    padding: 1px 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-left: 6px;
+}
+
+.event-who {
+    display: inline-block;
+    width: 70px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    color: #888;
+    text-transform: uppercase;
+}
+
+/* ---- Tomorrow Preview ---- */
+.section-tomorrow {
+    border-left: 4px solid #aaa;
+}
+
+/* ---- Unifi Security ---- */
+.unifi-summary {
+    margin-bottom: 8px;
+}
+
+.unifi-badge {
+    display: inline-block;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    background: #2e5f8a;
+    color: #fff;
+    padding: 2px 7px;
+    margin: 2px 4px 2px 0;
+}
+
+.unifi-badge-motion {
+    background: #666;
+}
+
+.unifi-cameras {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.unifi-cameras tr {
+    border-top: 1px solid #f0f0f0;
+}
+
+.unifi-cameras td {
+    padding: 4px 6px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+}
+
+.unifi-cam-name {
+    font-weight: bold;
+    color: #444;
+    width: 130px;
+    white-space: nowrap;
+}
+
+.unifi-cam-detail {
+    color: #555;
+}
+
+/* ---- Reading ---- */
+.reading-list {
+    list-style: none;
+    padding: 0;
+}
+
+.reading-list li {
+    padding: 4px 0;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.reading-title {
+    font-weight: bold;
+    color: #222;
+}
+
+.reading-author {
+    color: #666;
+    margin-left: 6px;
+    font-style: italic;
+}
+
+.reading-last-read {
+    float: right;
+    font-size: 12px;
+    color: #999;
+}
+
+.reading-stagnant .reading-last-read {
+    color: #b8860b;
+    font-weight: bold;
+}
+
+.reading-percent {
+    float: right;
+    font-size: 12px;
+    color: #4a90d9;
+    margin-left: 12px;
+    margin-right: 10px;
+}
+
+/* ---- GitHub ---- */
+.gh-type {
+    font-size: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #1b3a5c;
+    color: #fff;
+    padding: 1px 5px;
+    margin-right: 5px;
+}
+
+.gh-reason {
+    font-size: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #888;
+    margin-left: 5px;
+    font-style: italic;
+}
+
+/* ---- Health ---- */
+.section-health {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+}
+
+.health-row {
+    border-top: 1px solid #eee;
+    padding: 8px 0;
+}
+
+.health-row:first-of-type {
+    border-top: none;
+}
+
+.health-label {
+    font-weight: bold;
+    color: #444;
+    margin-bottom: 2px;
+}
+
+.health-missing {
+    display: inline-block;
+    background: #fce6c0;
+    color: #8a4b00;
+    border: 1px solid #e7c590;
+    padding: 0 5px;
+    margin-left: 6px;
+    font-weight: normal;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.health-value {
+    color: #222;
+    margin-bottom: 4px;
+}
+
+.health-sub {
+    color: #888;
+    font-size: 12px;
+}
+
+.trend {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 12px;
+    padding: 0 4px;
+    border: 1px solid #ddd;
+    background: #f6f6f1;
+    color: #666;
+}
+
+.trend-good { color: #2c6b2c; border-color: #b5d6b5; background: #e8f3e6; }
+.trend-bad  { color: #8a2222; border-color: #ddb3b3; background: #f6e1e1; }
+.trend-flat { color: #777; }
+
+.sparkline {
+    position: relative;
+    height: 32px;
+    background: #f6f6f1;
+    border: 1px solid #ddd;
+    padding: 2px;
+    white-space: nowrap;
+    font-size: 0;       /* eats inline-block whitespace */
+    line-height: 0;
+    overflow: hidden;
+}
+
+.sparkline .spark-target {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    height: 0;
+    border-top: 1px dashed #cc4444;
+    z-index: 1;
+}
+
+.sparkline .bar {
+    display: inline-block;
+    vertical-align: bottom;
+    width: 6px;
+    margin-right: 1px;
+    background: #1a4a7a;
+    min-height: 1px;
+    height: 1px;
+}
+
+.sparkline .bar-empty {
+    background: #e3e3dd;
+    height: 100%;
+}
+
+/* ---- Chat ---- */
+.section-chat {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.chat-log {
+    background: #f6f6f1;
+    border: 1px solid #ddd;
+    padding: 8px 10px;
+    max-height: 320px;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.chat-turn {
+    margin-bottom: 8px;
+    word-wrap: break-word;
+}
+
+.chat-turn-user {
+    color: #1a3a5c;
+}
+
+.chat-turn-agent {
+    color: #222;
+}
+
+.chat-role {
+    font-weight: bold;
+    margin-right: 4px;
+}
+
+.chat-tools {
+    font-size: 11px;
+    color: #777;
+    background: #ececec;
+    border-left: 2px solid #bbb;
+    padding: 4px 8px;
+    margin-bottom: 8px;
+    font-family: Menlo, Monaco, "Courier New", monospace;
+}
+
+.chat-form {
+    display: block;
+    width: 100%;
+    overflow: hidden; /* contain floats */
+}
+
+.chat-input {
+    float: left;
+    width: 80%;
+    padding: 6px 8px;
+    font-size: 14px;
+    font-family: Arial, Helvetica, sans-serif;
+    border: 1px solid #bbb;
+    box-sizing: border-box;
+}
+
+.chat-send {
+    float: right;
+    width: 100px;
+    padding: 6px 8px;
+    font-size: 14px;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #1a4a7a;
+    color: #fff;
+    border: 1px solid #143959;
+    cursor: pointer;
+    box-sizing: border-box;
+}
+
+.chat-send[disabled] {
+    background: #888;
+    border-color: #666;
+    cursor: default;
+}
+
+.chat-status {
+    font-size: 11px;
+    color: #888;
+    margin-top: 6px;
+    min-height: 14px;
+}
+
+.chat-status-error {
+    color: #a33;
+}
+
+/* ---- Footer ---- */
+.footer {
+    text-align: center;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    color: #bbb;
+    padding: 8px;
+    max-width: 860px;
+    margin: 0 auto;
+}
