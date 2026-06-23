@@ -218,7 +218,7 @@ $regular_count = count($news_regular);
 <?php endif; ?>
 
 <?php
-function render_sparkline($spark, $baseline_zero = false) {
+function render_sparkline($spark, $baseline_zero = false, $target = null, $target_label = '', $pad = 0) {
     if (!is_array($spark) || count($spark) === 0) { return ''; }
     $nums = array();
     foreach ($spark as $v) { if ($v !== null) { $nums[] = (float)$v; } }
@@ -226,10 +226,37 @@ function render_sparkline($spark, $baseline_zero = false) {
         $maxv = 1.0; $minv = 0.0;
     } else {
         $maxv = max($nums); $minv = min($nums);
-        if ($baseline_zero) { $minv = 0.0; }
+        if ($baseline_zero) {
+            $minv = 0.0;
+        } else if ($pad > 0) {
+            // Tight-scaled metrics (weight): pad the range above/below the
+            // logged values so the goal line and any future excursions have
+            // room to show instead of clamping to an edge.
+            $minv -= $pad; $maxv += $pad;
+        }
+        // Fold the target into the visible range so the line is always on-chart
+        // and bars can be read as above/below it (covers a goal that sits even
+        // beyond the padded range).
+        if ($target !== null) {
+            $minv = min($minv, (float)$target);
+            $maxv = max($maxv, (float)$target);
+        }
         if ($maxv === $minv) { $maxv = $minv + 1.0; }
     }
     $out = '<div class="sparkline">';
+    // Optional horizontal reference line at $target (in the same units as the
+    // bars). Positioned in px so it aligns with where a bar of that value would
+    // top out: bars sit on a 28px content box (32px box - 2*2px padding), 2px
+    // above the container's bottom edge.
+    if ($nums && $target !== null && $maxv > $minv) {
+        $tpct = (($target - $minv) / ($maxv - $minv)) * 100;
+        if ($tpct < 0) { $tpct = 0; }
+        if ($tpct > 100) { $tpct = 100; }
+        $tpx = 2 + ($tpct / 100) * 28;
+        $label = $target_label !== '' ? $target_label : ('target ' . round($target, 1));
+        $ttitle = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+        $out .= '<div class="spark-target" style="bottom:' . round($tpx, 1) . 'px" title="' . $ttitle . '"></div>';
+    }
     foreach ($spark as $v) {
         if ($v === null) {
             $out .= '<div class="bar bar-empty" title="no data"></div>';
@@ -275,7 +302,10 @@ function trend_arrow($trend) {
                 echo trend_arrow($trend);
             ?>
         </div>
-        <?php echo render_sparkline(isset($hw['sparkline']) ? $hw['sparkline'] : array(), false); ?>
+        <?php echo render_sparkline(isset($hw['sparkline']) ? $hw['sparkline'] : array(), false,
+            isset($hw['target']) ? $hw['target'] : null,
+            isset($hw['target']) ? 'goal ' . h((string)$hw['target']) . ' ' . h($hw['unit']) : '',
+            isset($hw['chart_pad']) ? $hw['chart_pad'] : 10); ?>
     </div>
 
     <div class="health-row">
@@ -291,7 +321,9 @@ function trend_arrow($trend) {
             <?php endif; ?>
             <?php echo trend_arrow(isset($ha['trend']) ? $ha['trend'] : 'flat'); ?>
         </div>
-        <?php echo render_sparkline(isset($ha['sparkline']) ? $ha['sparkline'] : array(), true); ?>
+        <?php echo render_sparkline(isset($ha['sparkline']) ? $ha['sparkline'] : array(), true,
+            !empty($ha['weekly_target']) ? $ha['weekly_target'] / 7.0 : null,
+            !empty($ha['weekly_target']) ? 'target ' . round($ha['weekly_target'] / 7.0, 1) . '/day (' . h((string)$ha['weekly_target']) . '/wk)' : ''); ?>
     </div>
 
     <div class="health-row">
@@ -307,7 +339,9 @@ function trend_arrow($trend) {
             <?php endif; ?>
             <?php echo trend_arrow(isset($he['trend']) ? $he['trend'] : 'flat'); ?>
         </div>
-        <?php echo render_sparkline(isset($he['sparkline']) ? $he['sparkline'] : array(), true); ?>
+        <?php echo render_sparkline(isset($he['sparkline']) ? $he['sparkline'] : array(), true,
+            !empty($he['weekly_target']) ? $he['weekly_target'] / 7.0 : null,
+            !empty($he['weekly_target']) ? 'target ' . round($he['weekly_target'] / 7.0, 1) . '/day (' . h((string)$he['weekly_target']) . '/wk)' : ''); ?>
     </div>
 </div>
 <?php endif; ?>

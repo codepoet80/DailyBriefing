@@ -35,19 +35,31 @@
       }
     ],
     "family": [
-      { "name": "Nicole", "url": "https://calendar.zoho.com/ical/..." },
-      { "name": "Ben",    "url": "https://calendar.google.com/..." }
+      {
+        "name": "Nicole",
+        "url": "https://calendar.zoho.com/ical/..."
+      },
+      {
+        "name": "Ben",
+        "url": "https://calendar.google.com/..."
+      }
     ]
   },
   "calendar_filters": {
-    "exclude_titles": ["Morning Routine"]
+    "exclude_titles": [
+      "Morning Routine"
+    ]
   },
   "news": {
     "importance_threshold": 2,
     "similarity_threshold": 0.65,
     "max_important": 8,
     "max_regular": 20,
-    "title_filters": ["coupon", "promo code", "deal of the day"]
+    "title_filters": [
+      "coupon",
+      "promo code",
+      "deal of the day"
+    ]
   },
   "geek_news": {
     "count": 20
@@ -72,7 +84,7 @@
   "todos": {
     "command": "${HOME}/Projects/library/macos/checkmate.py ls",
     "add_command": "${HOME}/Projects/library/macos/checkmate.py add",
-    "count": 8  
+    "count": 8
   },
   "reading": {
     "papyrus_dir": "~/ownCloud/Dropbox/.papyrus",
@@ -85,7 +97,7 @@
     "max_count": 30
   },
   "dialectic": {
-    "system_prompt": "The user is curious and wants to explore ideas with you. Not everything is a conflict — treat these as shared explorations. Be curious yourself: consider multiple angles, steelman positions you might disagree with, and if the user seems to be taking a side, gently expand, challenge, and probe with them rather than just agreeing. Favor questions and observations over declarations."
+    "system_prompt": "The user is curious and wants to explore ideas with you. Not everything is a conflict \u2014 treat these as shared explorations. Be curious yourself: consider multiple angles, steelman positions you might disagree with, and if the user seems to be taking a side, gently expand, challenge, and probe with them rather than just agreeing. Favor questions and observations over declarations."
   },
   "agent": {
     "enabled": false,
@@ -97,9 +109,17 @@
     "pushover_sound": ""
   },
   "health": {
-    "weight":   { "unit": "lbs", "goal_direction": "down" },
-    "alcohol":  { "weekly_target_drinks": 7 },
-    "exercise": { "weekly_target_minutes": 150 },
+    "weight": {
+      "unit": "lbs",
+      "goal_direction": "down",
+      "target": 150
+    },
+    "alcohol": {
+      "weekly_target_drinks": 7
+    },
+    "exercise": {
+      "weekly_target_minutes": 150
+    },
     "missed_notify_hour": 7,
     "chart_days": 30
   },
