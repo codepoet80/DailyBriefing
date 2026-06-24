@@ -46,6 +46,9 @@ def fetch_reading(config):
         if title.lower() in exclude_titles:
             continue
 
+        if round(position / 100) >= 99:
+            continue
+
         if days_since == 0:
             last_read_label = 'today'
         elif days_since == 1:
