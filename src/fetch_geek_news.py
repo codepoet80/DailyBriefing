@@ -11,15 +11,18 @@ HN_BASE = 'https://hacker-news.firebaseio.com/v0'
 
 def fetch_geek_news(config, feeds_config):
     count = config.get('geek_news', {}).get('count', 20)
+    # Over-fetch a buffer so that after cross-pipeline dedup (see build_briefing)
+    # the list can still be trimmed back up to `count`.
+    pool = count * 2
 
     slashdot_url = _slashdot_url(feeds_config)
 
-    hn_stories = _fetch_hn(count)
-    sd_stories = _fetch_slashdot(slashdot_url, count) if slashdot_url else []
+    hn_stories = _fetch_hn(pool)
+    sd_stories = _fetch_slashdot(slashdot_url, pool) if slashdot_url else []
 
     print('    HN: ' + str(len(hn_stories)) + ', Slashdot: ' + str(len(sd_stories)))
 
-    combined = _interleave(hn_stories, sd_stories)[:count]
+    combined = _interleave(hn_stories, sd_stories)[:pool]
     return combined
 
 

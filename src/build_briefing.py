@@ -16,7 +16,7 @@ from fetch_todos import fetch_todos
 from fetch_weather import fetch_weather
 from fetch_servers import fetch_servers
 from fetch_news import fetch_news
-from cluster_news import cluster_stories
+from cluster_news import cluster_stories, dedupe_geek_news
 from fetch_geek_news import fetch_geek_news
 from fetch_xkcd import fetch_xkcd
 from fetch_unifi import fetch_unifi
@@ -103,6 +103,18 @@ def main():
 
     print('  Fetching Geek News (HN + Slashdot)...')
     hackernews = fetch_geek_news(config, feeds)
+    # Geek News comes from a separate pipeline, so the RSS clustering never sees
+    # it. Dedupe it against the news sections and within itself (HN vs Slashdot).
+    news_titles = [s['title'] for s in news_important] + [s['title'] for s in news_regular]
+    before_geek = len(hackernews)
+    hackernews = dedupe_geek_news(
+        hackernews, news_titles,
+        threshold=news_cfg.get('similarity_threshold', 0.65),
+    )
+    geek_count = config.get('geek_news', {}).get('count', 20)
+    hackernews = hackernews[:geek_count]
+    if before_geek != len(hackernews):
+        print('  Deduped geek stories: ' + str(before_geek) + ' -> ' + str(len(hackernews)))
 
     print('  Fetching XKCD...')
     xkcd = fetch_xkcd(DATA_DIR)

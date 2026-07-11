@@ -30,6 +30,28 @@ def title_similarity(a, b):
     return difflib.SequenceMatcher(None, na, nb).ratio()
 
 
+def dedupe_geek_news(geek_stories, reference_titles=None, threshold=0.65):
+    """Drop near-duplicate geek-news items.
+
+    Geek News is assembled from a different pipeline than the clustered RSS news
+    (HN via Firebase + Slashdot via RSS), so the normal clustering never sees it.
+    This removes items that either:
+      - duplicate a title already shown in the news sections (reference_titles), or
+      - duplicate an earlier item in the geek list itself (HN and Slashdot both
+        covering the same story).
+    First occurrence wins, so the higher-ranked geek item is the one kept.
+    """
+    seen_titles = list(reference_titles or [])
+    kept = []
+    for story in geek_stories:
+        title = story.get('title', '')
+        if any(title_similarity(title, t) >= threshold for t in seen_titles):
+            continue
+        kept.append(story)
+        seen_titles.append(title)
+    return kept
+
+
 def cluster_stories(stories, threshold=0.65, importance_threshold=2):
     """
     Groups similar cross-source stories. Returns (important, regular).
