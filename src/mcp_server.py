@@ -526,9 +526,33 @@ async def list_tools():
             },
         ),
         types.Tool(
+            name='log_joy',
+            description=(
+                'Log a subjective joy/mood rating on a 1-5 scale (5 = most '
+                'joyful). The chat agent maps the user\'s description to an '
+                'integer — "great day" ≈ 5, "pretty good" ≈ 4, "meh"/"fine" ≈ 3, '
+                '"rough" ≈ 2, "awful" ≈ 1. Include the original wording as note.'
+            ),
+            inputSchema={
+                'type': 'object',
+                'properties': {
+                    'rating': {
+                        'type': 'integer',
+                        'description': 'Joy rating, integer 1-5 (5 = most joyful).',
+                    },
+                    'note': {'type': 'string', 'description': "User's original wording / context."},
+                    'date': {
+                        'type': 'string',
+                        'description': 'Optional ISO date YYYY-MM-DD. Defaults to today.',
+                    },
+                },
+                'required': ['rating'],
+            },
+        ),
+        types.Tool(
             name='get_health_summary',
             description=(
-                'Return fresh health-metric status (weight, alcohol, exercise) from '
+                'Return fresh health-metric status (weight, alcohol, exercise, joy) from '
                 'the JSONL log files: latest values, today_logged status, 7- and '
                 '30-day totals, and trend direction. Use this when the user asks '
                 'how they are doing on a metric instead of relying on the briefing '
@@ -1039,7 +1063,7 @@ async def call_tool(name: str, arguments: dict):
         reply += f'\n\nPrior conversation:\n{json.dumps(record, indent=2)}'
         return [types.TextContent(type='text', text=reply)]
 
-    if name in ('log_weight', 'log_alcohol', 'log_exercise'):
+    if name in ('log_weight', 'log_alcohol', 'log_exercise', 'log_joy'):
         from datetime import datetime, timezone
         health_dir = os.path.join(DATA_DIR, 'health')
         os.makedirs(health_dir, exist_ok=True)
@@ -1078,7 +1102,7 @@ async def call_tool(name: str, arguments: dict):
             }
             path = os.path.join(health_dir, 'alcohol.jsonl')
             reply = f'Logged {entry["drinks"]} standard drink(s) on {local_date}: {entry["raw_input"]}'
-        else:  # log_exercise
+        elif name == 'log_exercise':
             try:
                 minutes = float(arguments['minutes'])
             except (KeyError, TypeError, ValueError):
@@ -1098,6 +1122,20 @@ async def call_tool(name: str, arguments: dict):
             path = os.path.join(health_dir, 'exercise.jsonl')
             reply = (f'Logged {entry["minutes"]} min of {intensity} '
                      f'{entry["kind"] or "exercise"} on {local_date}.')
+        else:  # log_joy
+            try:
+                rating = int(arguments['rating'])
+            except (KeyError, TypeError, ValueError):
+                return [types.TextContent(type='text', text='Error: rating must be an integer')]
+            if rating < 1 or rating > 5:
+                return [types.TextContent(type='text', text='Error: rating must be 1-5')]
+            entry = {
+                'ts': now, 'date': local_date,
+                'rating': rating,
+                'note': arguments.get('note', '').strip(),
+            }
+            path = os.path.join(health_dir, 'joy.jsonl')
+            reply = f'Logged joy {rating}/5 on {local_date}.'
 
         with open(path, 'a+') as f:
             # Guard against a prior record that wasn't newline-terminated

@@ -218,11 +218,16 @@ $regular_count = count($news_regular);
 <?php endif; ?>
 
 <?php
-function render_sparkline($spark, $baseline_zero = false, $target = null, $target_label = '', $pad = 0) {
+function render_sparkline($spark, $baseline_zero = false, $target = null, $target_label = '', $pad = 0,
+                          $fixed_min = null, $fixed_max = null) {
     if (!is_array($spark) || count($spark) === 0) { return ''; }
     $nums = array();
     foreach ($spark as $v) { if ($v !== null) { $nums[] = (float)$v; } }
-    if (!$nums) {
+    if ($fixed_min !== null && $fixed_max !== null) {
+        // Bounded metrics (e.g. joy 1-5): pin the scale so bar heights read as
+        // absolute values, not just relative to the logged range.
+        $minv = (float)$fixed_min; $maxv = (float)$fixed_max;
+    } else if (!$nums) {
         $maxv = 1.0; $minv = 0.0;
     } else {
         $maxv = max($nums); $minv = min($nums);
@@ -281,6 +286,7 @@ function trend_arrow($trend) {
     $hw = isset($health['weight'])   ? $health['weight']   : array();
     $ha = isset($health['alcohol'])  ? $health['alcohol']  : array();
     $he = isset($health['exercise']) ? $health['exercise'] : array();
+    $hj = isset($health['joy'])      ? $health['joy']      : array();
 ?>
 <div class="section section-health">
     <h2>Health</h2>
@@ -343,6 +349,29 @@ function trend_arrow($trend) {
             !empty($he['weekly_target']) ? $he['weekly_target'] / 7.0 : null,
             !empty($he['weekly_target']) ? 'target ' . round($he['weekly_target'] / 7.0, 1) . '/day (' . h((string)$he['weekly_target']) . '/wk)' : ''); ?>
     </div>
+
+    <?php if ($hj): ?>
+    <div class="health-row">
+        <div class="health-label">
+            Joy
+            <?php if (empty($hj['today_logged'])): ?><span class="health-missing">log&hellip;</span><?php endif; ?>
+        </div>
+        <div class="health-value">
+            <?php $jmax = isset($hj['scale_max']) ? (int)$hj['scale_max'] : 5; ?>
+            <?php if (isset($hj['latest']) && $hj['latest'] !== null): ?>
+                <?php echo (int)$hj['latest']; ?>&thinsp;/&thinsp;<?php echo $jmax; ?>
+                <?php if (isset($hj['week_avg']) && $hj['week_avg'] !== null): ?>
+                    <span class="health-sub"><?php echo h((string)$hj['week_avg']); ?> avg this week</span>
+                <?php endif; ?>
+            <?php else: ?>
+                <span class="health-sub">no logs yet</span>
+            <?php endif; ?>
+            <?php echo trend_arrow(isset($hj['trend']) ? $hj['trend'] : 'flat'); ?>
+        </div>
+        <?php echo render_sparkline(isset($hj['sparkline']) ? $hj['sparkline'] : array(), false,
+            null, '', 0, 1, $jmax); ?>
+    </div>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 

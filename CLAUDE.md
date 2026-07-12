@@ -138,6 +138,7 @@ requirements.txt       # requests, icalendar, recurring_ical_events, feedparser,
     "weight":   { "unit": "lbs", "goal_direction": "down" },
     "alcohol":  { "weekly_target_drinks": 15 },
     "exercise": { "weekly_target_minutes": 150 },
+    "joy":      { "scale_max": 5 },   // subjective 1..scale_max mood rating
     "missed_notify_hour": 7,    // health_missing rule won't fire before this hour
     "chart_days": 30            // sparkline length
   },
@@ -211,7 +212,7 @@ Uses [Open-Meteo](https://open-meteo.com/) — no API key required. Returns curr
 3. **Weather** — collapsible (collapsed), summary shows temp + condition
 4. **Today** — my calendar, time-sorted, today only
 5. **Check Mate** — top N todos from `checkmate ls`
-6. **Health** — weight / alcohol / exercise. Per metric: latest value, weekly total vs target, trend badge (good/bad/flat), 30-day sparkline. "Log…" pill highlights anything not logged today.
+6. **Health** — weight / alcohol / exercise / joy. Per metric: latest value, weekly total vs target (or week average for joy), trend badge (good/bad/flat), 30-day sparkline. Joy's sparkline is pinned to a fixed 1..scale_max scale so bar heights read as absolute mood. "Log…" pill highlights anything not logged today.
 7. **Top Stories** — cross-source clustered news, collapsible (expanded by default)
 8. **More News** — regular feed items, collapsible (collapsed by default)
 9. **Geek News** — HN + Slashdot interleaved, collapsible (collapsed by default)
@@ -260,13 +261,14 @@ Tool allowlist: `config.chat_agent.allowed_tools` is the source of truth for wha
 
 ## Health Tracking
 
-Three metrics, three append-only JSONL files under `data/health/`:
+Four metrics, four append-only JSONL files under `data/health/`:
 
 | File | Schema |
 |---|---|
 | `weight.jsonl` | `{ts, date, pounds, note}` |
 | `alcohol.jsonl` | `{ts, date, drinks, raw_input, items:[{kind,count}]}` |
 | `exercise.jsonl` | `{ts, date, minutes, intensity, kind, raw_input}` |
+| `joy.jsonl` | `{ts, date, rating, note}` — subjective mood, integer 1-5 (5 = most joyful) |
 
 ### Logging via the chat agent
 
@@ -275,10 +277,11 @@ The chat agent converts natural language into structured values **in-conversatio
 - **Alcohol** = US standard drinks (14g pure ethanol). 5oz wine = 12oz 5% beer = 1.5oz spirit = 1. Wine bottle = 5; shared bottle = 2.5 each. Double pour / old fashioned / martini ≈ 2.
 - **Exercise** = minutes + intensity (`light`/`moderate`/`vigorous`) + free-text kind. Rough fallback estimates: "ran 3 miles" ≈ 30 min vigorous, "yoga class" ≈ 60 min moderate.
 - **Weight** = pounds. Agent multiplies if user gives kg.
+- **Joy** = integer 1-5 (5 = most joyful). Agent maps free-text mood to the scale ("great day" ≈ 5, "meh" ≈ 3, "awful" ≈ 1); original wording goes in `note`. One rating per day (latest wins, like weight).
 
 ### Aggregation (`fetch_health.py`)
 
-Called from `build_briefing.py`. Produces per-metric: `latest`, `today_logged`, weekly total (`week_drinks` / `week_minutes`), 30-day `sparkline` (list of numbers or `null` for "no log"), and `trend` (`good`/`bad`/`flat`).
+Called from `build_briefing.py`. Produces per-metric: `latest`, `today_logged`, weekly total (`week_drinks` / `week_minutes`) or average (`week_avg` for joy), 30-day `sparkline` (list of numbers or `null` for "no log"), and `trend` (`good`/`bad`/`flat`).
 
 **Weekly totals use a Sunday–Saturday calendar week** (`_week_dates()` in `fetch_health.py`), not a rolling 7-day window — a workout on Saturday counts toward that week; Sunday starts a fresh one. The 30-day sparkline still uses a rolling window (`_day_range`).
 
@@ -286,6 +289,7 @@ Trend logic:
 - **Weight** — slope-based. Compares last 3 logs to prior 3. Threshold: 0.5% of prior avg or 0.3 lb (whichever bigger). Requires ≥4 data points.
 - **Alcohol** — target-based. `good` when week ≤ 60% of `weekly_target_drinks`, `bad` when over target, else `flat`.
 - **Exercise** — target-based. `good` when week ≥ `weekly_target_minutes`, `bad` when below 60%, else `flat`.
+- **Joy** — slope-based with up-is-good (reuses the weight slope logic, `goal_direction='up'`). Rising mood → `good`. Requires ≥4 data points.
 
 The target-based design for alcohol/exercise is intentional: slope alone misleads when there's no prior-week data (looks like "going up from zero").
 
@@ -301,7 +305,7 @@ The target-based design for alcohol/exercise is intentional: slope alone mislead
 
 ### UI
 
-`render_sparkline()` in `index.php` emits a row of `<div class="bar">`s with percentage heights. Old-WebKit safe — no SVG, no canvas. Weight uses tight min-max scaling (small changes visible); alcohol/exercise use 0-baseline (so zero days look like zero).
+`render_sparkline()` in `index.php` emits a row of `<div class="bar">`s with percentage heights. Old-WebKit safe — no SVG, no canvas. Weight uses tight min-max scaling (small changes visible); alcohol/exercise use 0-baseline (so zero days look like zero); joy uses a fixed 1..scale_max scale (via `$fixed_min`/`$fixed_max`) so a "5" is full height and a "2" is low.
 
 ## MCP Tools (full inventory)
 
@@ -315,7 +319,7 @@ Defined in `src/mcp_server.py`. The desktop session has all of them; the web cha
 | `send_notification` | Push via Pushover (priority -1/0/1) |
 | `send_message` | iMessage/SMS via the message-bridge sidecar, optional `delay_minutes` |
 | `dialectic_save` / `_append` / `_list` / `_get` / `_summary` / `_close` / `_resume` | See Dialectics section. `_summary` returns compact recap (first + last N turns) — use for "what was that about"-style asks. |
-| `log_weight` / `log_alcohol` / `log_exercise` | Append to `data/health/*.jsonl` |
+| `log_weight` / `log_alcohol` / `log_exercise` / `log_joy` | Append to `data/health/*.jsonl` |
 | `get_health_summary` | Live read of `data/health/*.jsonl`, returns compact stats |
 | `get_time` | Local time + ISO + UTC |
 | `get_public_ip` | Hits `api.ipify.org` (5s timeout) |

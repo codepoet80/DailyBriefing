@@ -120,6 +120,9 @@
     "exercise": {
       "weekly_target_minutes": 150
     },
+    "joy": {
+      "scale_max": 5
+    },
     "missed_notify_hour": 7,
     "chart_days": 30
   },
@@ -148,6 +151,7 @@
       "log_weight",
       "log_alcohol",
       "log_exercise",
+      "log_joy",
       "get_health_summary"
     ],
     "system_prompt_extra": ""

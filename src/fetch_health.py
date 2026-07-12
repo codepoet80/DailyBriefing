@@ -9,6 +9,8 @@ Returns a dict shaped:
                weekly_target, raw_today},
   "exercise": {today_minutes, week_minutes, today_logged, sparkline, trend,
                weekly_target, last_kind},
+  "joy":      {latest, latest_date, today_logged, sparkline, trend,
+               week_avg, scale_max},
 }
 
 Sparklines are lists of length `chart_days` (default 30), one entry per day
@@ -190,6 +192,44 @@ def _exercise_summary(cfg, days):
     }
 
 
+def _joy_summary(cfg, days):
+    """Joy is a subjective daily rating (1..scale_max, higher is better).
+    One value per day (latest log wins, like weight). Trend is slope-based
+    with up-is-good, so a rising mood reads as 'good'."""
+    rows = _read_jsonl(os.path.join(HEALTH_DIR, 'joy.jsonl'))
+    by_day = {}
+    for r in rows:
+        d = r.get('date')
+        if not d:
+            continue
+        # Keep latest log per day (overwrite on duplicates)
+        by_day[d] = r.get('rating')
+
+    today_iso = date.today().isoformat()
+    spark = [by_day.get(d.isoformat()) for d in _day_range(days)]
+
+    latest = None
+    latest_date = None
+    if rows:
+        latest_row = max(rows, key=lambda r: (r.get('date', ''), r.get('ts', '')))
+        latest = latest_row.get('rating')
+        latest_date = latest_row.get('date')
+
+    week_vals = [by_day[d.isoformat()] for d in _week_dates()
+                 if by_day.get(d.isoformat()) is not None]
+    week_avg = round(sum(week_vals) / len(week_vals), 1) if week_vals else None
+
+    return {
+        'latest': latest,
+        'latest_date': latest_date,
+        'today_logged': today_iso in by_day,
+        'sparkline': spark,
+        'trend': _weight_slope_trend(spark, goal_direction='up'),
+        'week_avg': week_avg,
+        'scale_max': int(cfg.get('joy', {}).get('scale_max', 5)),
+    }
+
+
 def fetch_health(full_config, compact=False):
     cfg = full_config.get('health', {}) or {}
     days = int(cfg.get('chart_days', 30))
@@ -197,6 +237,7 @@ def fetch_health(full_config, compact=False):
         'weight':   _weight_summary(cfg, days),
         'alcohol':  _alcohol_summary(cfg, days),
         'exercise': _exercise_summary(cfg, days),
+        'joy':      _joy_summary(cfg, days),
     }
     if compact:
         # drop the full sparkline for chat-tool output, keep totals/trends

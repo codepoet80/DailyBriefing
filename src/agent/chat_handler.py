@@ -153,9 +153,10 @@ def _build_stable_system_text(config):
         "one.",
 
         "Health logging protocol:\n"
-        "- Jon tracks weight (lbs), alcohol (US standard drinks), and exercise "
-        "(minutes + intensity). Three MCP tools: log_weight, log_alcohol, "
-        "log_exercise. A fourth, get_health_summary, returns fresh totals/trend.\n"
+        "- Jon tracks weight (lbs), alcohol (US standard drinks), exercise "
+        "(minutes + intensity), and joy (a 1-5 mood rating). Four log tools: "
+        "log_weight, log_alcohol, log_exercise, log_joy. A fifth, "
+        "get_health_summary, returns fresh totals/trend.\n"
         "- When Jon mentions health information conversationally — 'I'm 178 this "
         "morning', 'we shared a bottle of wine', 'just ran 3 miles' — translate "
         "and log it WITHOUT asking confirmation unless the input is genuinely "
@@ -178,6 +179,10 @@ def _build_stable_system_text(config):
         "vigorous, 'walked dog' ≈ 20 min light, 'yoga class' ≈ 60 min moderate, "
         "'lifted' ≈ 45 min moderate. Ask if truly unclear.\n"
         "- Weight: just a number in pounds. If Jon gives kg, multiply by 2.20462.\n"
+        "- Joy → an integer 1-5 (5 = most joyful). Map free-text mood to the "
+        "scale: 'great day'/'so happy' ≈ 5, 'pretty good' ≈ 4, 'fine'/'meh'/'ok' "
+        "≈ 3, 'rough'/'down' ≈ 2, 'awful'/'terrible' ≈ 1. If Jon gives a number "
+        "directly, use it. Pass his original wording as note.\n"
         "- If Jon asks 'how am I doing on X?' or 'what's my trend?' call "
         "get_health_summary for fresh numbers — the briefing JSON snapshot below "
         "may be stale if he logged something this session.",
