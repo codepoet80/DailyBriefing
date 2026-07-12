@@ -359,7 +359,7 @@ function trend_arrow($trend) {
         <div class="health-value">
             <?php $jmax = isset($hj['scale_max']) ? (int)$hj['scale_max'] : 5; ?>
             <?php if (isset($hj['latest']) && $hj['latest'] !== null): ?>
-                <?php echo (int)$hj['latest']; ?>&thinsp;/&thinsp;<?php echo $jmax; ?>
+                <?php echo h(rtrim(rtrim(number_format((float)$hj['latest'], 1), '0'), '.')); ?>&thinsp;/&thinsp;<?php echo $jmax; ?>
                 <?php if (isset($hj['week_avg']) && $hj['week_avg'] !== null): ?>
                     <span class="health-sub"><?php echo h((string)$hj['week_avg']); ?> avg this week</span>
                 <?php endif; ?>

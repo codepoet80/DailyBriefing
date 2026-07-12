@@ -529,16 +529,17 @@ async def list_tools():
             name='log_joy',
             description=(
                 'Log a subjective joy/mood rating on a 1-5 scale (5 = most '
-                'joyful). The chat agent maps the user\'s description to an '
-                'integer — "great day" ≈ 5, "pretty good" ≈ 4, "meh"/"fine" ≈ 3, '
-                '"rough" ≈ 2, "awful" ≈ 1. Include the original wording as note.'
+                'joyful). The chat agent maps the user\'s description to a '
+                'number — "great day" ≈ 5, "pretty good" ≈ 4, "meh"/"fine" ≈ 3, '
+                '"rough" ≈ 2, "awful" ≈ 1. Half-steps like 3.5 are allowed. '
+                'Include the original wording as note.'
             ),
             inputSchema={
                 'type': 'object',
                 'properties': {
                     'rating': {
-                        'type': 'integer',
-                        'description': 'Joy rating, integer 1-5 (5 = most joyful).',
+                        'type': 'number',
+                        'description': 'Joy rating from 1 to 5 (5 = most joyful). Half-steps like 3.5 allowed.',
                     },
                     'note': {'type': 'string', 'description': "User's original wording / context."},
                     'date': {
@@ -1124,18 +1125,20 @@ async def call_tool(name: str, arguments: dict):
                      f'{entry["kind"] or "exercise"} on {local_date}.')
         else:  # log_joy
             try:
-                rating = int(arguments['rating'])
+                rating = float(arguments['rating'])
             except (KeyError, TypeError, ValueError):
-                return [types.TextContent(type='text', text='Error: rating must be an integer')]
+                return [types.TextContent(type='text', text='Error: rating must be a number')]
             if rating < 1 or rating > 5:
-                return [types.TextContent(type='text', text='Error: rating must be 1-5')]
+                return [types.TextContent(type='text', text='Error: rating must be between 1 and 5')]
+            rating = round(rating * 2) / 2  # snap to nearest half-step
             entry = {
                 'ts': now, 'date': local_date,
                 'rating': rating,
                 'note': arguments.get('note', '').strip(),
             }
             path = os.path.join(health_dir, 'joy.jsonl')
-            reply = f'Logged joy {rating}/5 on {local_date}.'
+            rating_str = f'{rating:g}'  # 3.0 -> "3", 3.5 -> "3.5"
+            reply = f'Logged joy {rating_str}/5 on {local_date}.'
 
         with open(path, 'a+') as f:
             # Guard against a prior record that wasn't newline-terminated

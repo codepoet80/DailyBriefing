@@ -268,7 +268,7 @@ Four metrics, four append-only JSONL files under `data/health/`:
 | `weight.jsonl` | `{ts, date, pounds, note}` |
 | `alcohol.jsonl` | `{ts, date, drinks, raw_input, items:[{kind,count}]}` |
 | `exercise.jsonl` | `{ts, date, minutes, intensity, kind, raw_input}` |
-| `joy.jsonl` | `{ts, date, rating, note}` — subjective mood, integer 1-5 (5 = most joyful) |
+| `joy.jsonl` | `{ts, date, rating, note}` — subjective mood, 1-5 (5 = most joyful); half-steps allowed, snapped to nearest 0.5 |
 
 ### Logging via the chat agent
 
@@ -277,7 +277,7 @@ The chat agent converts natural language into structured values **in-conversatio
 - **Alcohol** = US standard drinks (14g pure ethanol). 5oz wine = 12oz 5% beer = 1.5oz spirit = 1. Wine bottle = 5; shared bottle = 2.5 each. Double pour / old fashioned / martini ≈ 2.
 - **Exercise** = minutes + intensity (`light`/`moderate`/`vigorous`) + free-text kind. Rough fallback estimates: "ran 3 miles" ≈ 30 min vigorous, "yoga class" ≈ 60 min moderate.
 - **Weight** = pounds. Agent multiplies if user gives kg.
-- **Joy** = integer 1-5 (5 = most joyful). Agent maps free-text mood to the scale ("great day" ≈ 5, "meh" ≈ 3, "awful" ≈ 1); original wording goes in `note`. One rating per day (latest wins, like weight).
+- **Joy** = 1-5 (5 = most joyful); half-steps like 3.5 allowed (snapped to nearest 0.5). Agent maps free-text mood to the scale ("great day" ≈ 5, "meh" ≈ 3, "awful" ≈ 1); original wording goes in `note`. One rating per day (latest wins, like weight).
 
 ### Aggregation (`fetch_health.py`)
 
