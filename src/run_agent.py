@@ -95,6 +95,20 @@ def evaluate_rules(briefing, rules):
                         'summary': f"Servers down: {', '.join(down)}",
                     })
 
+        elif rule_type == 'local_services':
+            ls = briefing.get('local_services', {})
+            if ls and not ls.get('all_up', True):
+                down = [s['name'] for s in ls.get('services', [])
+                        if not s.get('up', True)]
+                if down:
+                    key = ':'.join(sorted(down))
+                    candidates.append({
+                        'rule': rule,
+                        'item_key': key,
+                        'data': {'down': down},
+                        'summary': f"App service down: {', '.join(down)}",
+                    })
+
         elif rule_type == 'security':
             unifi = briefing.get('unifi')
             if unifi and unifi.get('total_events', 0) > 0:

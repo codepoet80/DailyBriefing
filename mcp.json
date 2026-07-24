@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "daily-briefing": {
-      "command": "${HOME}/DailyBriefing/.venv/bin/python3",
-      "args": ["${HOME}/DailyBriefing/src/mcp_server.py"]
+      "command": "${HOME}/path/to/DailyBriefing/.venv/bin/python3",
+      "args": ["${HOME}/path/to/DailyBriefing/src/mcp_server.py"]
     }
   }
 }

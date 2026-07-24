@@ -673,6 +673,14 @@ h2 {
     height: 100%;
 }
 
+.weekbars .wbar {
+    position: absolute;
+    min-height: 1px;
+}
+.weekbars .wbar-good    { background: #3a9a3a; }
+.weekbars .wbar-bad     { background: #c0392b; }
+.weekbars .wbar-partial { background: #b8b8b8; }
+
 /* ---- Chat ---- */
 .section-chat {
     font-family: Arial, Helvetica, sans-serif;

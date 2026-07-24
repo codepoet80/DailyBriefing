@@ -24,6 +24,13 @@
       "dedupe_hours": 1
     },
     {
+      "id": "app_service_down",
+      "type": "local_services",
+      "enabled": true,
+      "pushover_priority": 1,
+      "dedupe_hours": 1
+    },
+    {
       "id": "security_overnight",
       "type": "security",
       "enabled": true,

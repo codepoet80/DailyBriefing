@@ -2,6 +2,12 @@
   "greeting": {
     "name": "Your Name"
   },
+  "local_services": [
+    { "name": "BlueBubbles", "type": "process", "match": "bluebubbles" },
+    { "name": "Docker",      "type": "process", "match": "docker.app" },
+    { "name": "Plex",        "type": "process", "match": "plex media server" },
+    { "name": "MyContainer", "type": "docker",  "match": "my-container-name" }
+  ],
   "weather": {
     "latitude": 0.0,
     "longitude": 0.0,

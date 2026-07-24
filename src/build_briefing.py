@@ -15,6 +15,7 @@ from fetch_calendars import fetch_calendars
 from fetch_todos import fetch_todos
 from fetch_weather import fetch_weather
 from fetch_servers import fetch_servers
+from fetch_local_services import fetch_local_services
 from fetch_news import fetch_news
 from cluster_news import cluster_stories, dedupe_geek_news
 from fetch_geek_news import fetch_geek_news
@@ -74,6 +75,9 @@ def main():
 
     print('  Fetching server status...')
     servers = fetch_servers(config)
+
+    print('  Checking local services...')
+    local_services = fetch_local_services(config)
 
     print('  Fetching weather...')
     weather = fetch_weather(config)
@@ -143,6 +147,7 @@ def main():
         'greeting': greeting,
         'verse': verse,
         'servers': servers,
+        'local_services': local_services,
         'weather': weather,
         'my_calendar': my_calendar if run_type != 'evening' else [],
         'todos': todos,

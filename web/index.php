@@ -26,6 +26,7 @@ function h($str) {
 $greeting        = isset($briefing['greeting'])        ? $briefing['greeting']        : array();
 $verse           = isset($briefing['verse'])           ? $briefing['verse']           : array();
 $servers         = isset($briefing['servers'])         ? $briefing['servers']         : null;
+$local_services  = isset($briefing['local_services'])  ? $briefing['local_services']  : null;
 $weather         = isset($briefing['weather'])         ? $briefing['weather']         : null;
 $my_calendar     = isset($briefing['my_calendar'])     ? $briefing['my_calendar']     : array();
 $todos           = isset($briefing['todos'])           ? $briefing['todos']           : array();
@@ -99,6 +100,18 @@ $regular_count = count($news_regular);
         <?php echo h(implode(', ', $site['down'])); ?>
         <?php endif; ?>
     <?php endforeach; ?>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($local_services): ?>
+<div class="section section-servers <?php echo $local_services['all_up'] ? 'servers-up' : 'servers-down'; ?>">
+    <?php if ($local_services['all_up']): ?>
+    <span class="servers-icon">√ </span> App Services Up
+    <?php else: ?>
+    <span class="servers-icon">! </span> App Service Down:
+    <?php $down = array(); foreach ($local_services['services'] as $svc) { if (!$svc['up']) { $down[] = $svc['name']; } } ?>
+    <?php echo h(implode(', ', $down)); ?>
     <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -275,6 +288,57 @@ function render_sparkline($spark, $baseline_zero = false, $target = null, $targe
     return $out;
 }
 
+function render_week_bars($weekly, $target, $under_is_good, $unit = '') {
+    if (!is_array($weekly) || count($weekly) === 0) { return ''; }
+    $totals = array();
+    foreach ($weekly as $w) { $totals[] = (float)$w['total']; }
+    $maxv = max($totals);
+    if ($target !== null) { $maxv = max($maxv, (float)$target); }
+    if ($maxv <= 0) { $maxv = 1.0; }
+    $maxv = $maxv * 1.2;   // headroom above the tallest bar / target line
+
+    // Bars AND the target line are absolutely positioned from the same 2px
+    // floor over a 28px range, so a bar of value v tops out at exactly
+    // 2 + (v/maxv)*28 — the same coordinate the target line uses. Sharing one
+    // frame (rather than in-flow bars vs an absolute line) makes "above /
+    // below the line" read true regardless of box-model quirks.
+    $floor = 2; $range = 28; $bw = 16; $pitch = 21; $left0 = 3;
+    $n = count($weekly);
+    $width = $left0 + ($n - 1) * $pitch + $bw + 2;
+
+    $out = '<div class="sparkline weekbars" style="width:' . $width . 'px">';
+    if ($target !== null) {
+        $tpx = $floor + (((float)$target / $maxv) * $range);
+        $ttitle = htmlspecialchars('target ' . round($target, 1) . ($unit ? ' ' . $unit : '') . '/wk',
+                                   ENT_QUOTES, 'UTF-8');
+        $out .= '<div class="spark-target" style="bottom:' . round($tpx, 1) . 'px" title="' . $ttitle . '"></div>';
+    }
+    $i = 0;
+    foreach ($weekly as $w) {
+        $v = (float)$w['total'];
+        $hpx = max(1, (int) round(($v / $maxv) * $range));
+        $left = $left0 + $i * $pitch;
+        if (!empty($w['partial'])) {
+            $cls = 'wbar-partial';                       // in-progress week — don't judge yet
+        } else if ($target === null) {
+            $cls = 'wbar-good';
+        } else if ($under_is_good) {
+            $cls = ($v <= (float)$target) ? 'wbar-good' : 'wbar-bad';
+        } else {
+            $cls = ($v >= (float)$target) ? 'wbar-good' : 'wbar-bad';
+        }
+        $wk = date('M j', strtotime($w['start']));
+        $tip = htmlspecialchars('Week of ' . $wk . ': ' . rtrim(rtrim(number_format($v, 1), '0'), '.')
+                                . ($unit ? ' ' . $unit : '') . (!empty($w['partial']) ? ' (so far)' : ''),
+                                ENT_QUOTES, 'UTF-8');
+        $out .= '<i class="wbar ' . $cls . '" style="left:' . $left . 'px;bottom:' . $floor
+              . 'px;width:' . $bw . 'px;height:' . $hpx . 'px" title="' . $tip . '"></i>';
+        $i++;
+    }
+    $out .= '</div>';
+    return $out;
+}
+
 function trend_arrow($trend) {
     if ($trend === 'good') return '<span class="trend trend-good" title="trending in the right direction">&uarr;&darr;</span>';
     if ($trend === 'bad')  return '<span class="trend trend-bad" title="trending the wrong way">!</span>';
@@ -327,9 +391,8 @@ function trend_arrow($trend) {
             <?php endif; ?>
             <?php echo trend_arrow(isset($ha['trend']) ? $ha['trend'] : 'flat'); ?>
         </div>
-        <?php echo render_sparkline(isset($ha['sparkline']) ? $ha['sparkline'] : array(), true,
-            !empty($ha['weekly_target']) ? $ha['weekly_target'] / 7.0 : null,
-            !empty($ha['weekly_target']) ? 'target ' . round($ha['weekly_target'] / 7.0, 1) . '/day (' . h((string)$ha['weekly_target']) . '/wk)' : ''); ?>
+        <?php echo render_week_bars(isset($ha['weekly']) ? $ha['weekly'] : array(),
+            !empty($ha['weekly_target']) ? $ha['weekly_target'] : null, true, 'drinks'); ?>
     </div>
 
     <div class="health-row">
@@ -345,9 +408,8 @@ function trend_arrow($trend) {
             <?php endif; ?>
             <?php echo trend_arrow(isset($he['trend']) ? $he['trend'] : 'flat'); ?>
         </div>
-        <?php echo render_sparkline(isset($he['sparkline']) ? $he['sparkline'] : array(), true,
-            !empty($he['weekly_target']) ? $he['weekly_target'] / 7.0 : null,
-            !empty($he['weekly_target']) ? 'target ' . round($he['weekly_target'] / 7.0, 1) . '/day (' . h((string)$he['weekly_target']) . '/wk)' : ''); ?>
+        <?php echo render_week_bars(isset($he['weekly']) ? $he['weekly'] : array(),
+            !empty($he['weekly_target']) ? $he['weekly_target'] : null, false, 'min'); ?>
     </div>
 
     <?php if ($hj): ?>

@@ -137,6 +137,25 @@ def _sum_by_day(rows, value_key):
     return out
 
 
+def _weekly_totals(by_day, weeks, as_int=False):
+    """Totals per Sunday–Saturday week for the last `weeks` weeks, oldest
+    first; the final entry is the current (in-progress) week, flagged partial.
+    `by_day` maps ISO date -> value. Week boundary matches _week_dates()."""
+    today = date.today()
+    this_start = today - timedelta(days=(today.weekday() + 1) % 7)  # Sunday
+    out = []
+    for w in range(weeks - 1, -1, -1):
+        start = this_start - timedelta(days=7 * w)
+        total = sum(by_day.get((start + timedelta(days=i)).isoformat(), 0)
+                    for i in range(7))
+        out.append({
+            'start':   start.isoformat(),
+            'total':   int(round(total)) if as_int else round(total, 2),
+            'partial': w == 0,
+        })
+    return out
+
+
 def _alcohol_summary(cfg, days):
     rows = _read_jsonl(os.path.join(HEALTH_DIR, 'alcohol.jsonl'))
     by_day = _sum_by_day(rows, 'drinks')
@@ -152,11 +171,13 @@ def _alcohol_summary(cfg, days):
     raw_today = [r.get('raw_input', '') for r in rows if r.get('date') == today_iso]
 
     target = cfg.get('alcohol', {}).get('weekly_target_drinks')
+    weeks = int(cfg.get('chart_weeks', 6))
     return {
         'today_drinks':   round(today_drinks, 2),
         'week_drinks':    week_drinks,
         'today_logged':   today_iso in by_day,
         'sparkline':      spark,
+        'weekly':         _weekly_totals(by_day, weeks, as_int=False),
         'trend':          _target_status(week_drinks, target, under_is_good=True),
         'weekly_target':  target,
         'raw_today':      raw_today,
@@ -181,11 +202,13 @@ def _exercise_summary(cfg, days):
         last_kind = last.get('kind', '') or last.get('intensity', '')
 
     target = cfg.get('exercise', {}).get('weekly_target_minutes')
+    weeks = int(cfg.get('chart_weeks', 6))
     return {
         'today_minutes': today_minutes,
         'week_minutes':  week_minutes,
         'today_logged':  today_iso in by_day,
         'sparkline':     spark,
+        'weekly':        _weekly_totals(by_day, weeks, as_int=True),
         'trend':         _target_status(week_minutes, target, under_is_good=False),
         'weekly_target': target,
         'last_kind':     last_kind,

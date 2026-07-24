@@ -60,6 +60,33 @@ def _ensure_conversations_dir():
     os.makedirs(CONVERSATIONS_DIR, exist_ok=True)
 
 
+def _last_health_entry(path):
+    """Return the last JSON object in a JSONL file, or None if unavailable."""
+    if not os.path.exists(path):
+        return None
+    try:
+        last = None
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    last = line
+        return json.loads(last) if last else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _is_duplicate_health_entry(prev, entry):
+    """True if `entry` re-logs `prev` — same on every field except the write
+    timestamp `ts`. Because `date` is one of the compared fields, a genuine
+    identical re-log on a different day still writes; only a repeat of the
+    immediately-previous entry (an accidental double tool call) is caught."""
+    if not prev:
+        return False
+    return {k: v for k, v in prev.items() if k != 'ts'} == \
+           {k: v for k, v in entry.items() if k != 'ts'}
+
+
 def _resolve_dialectic_ref(ref):
     """Resolve an id-or-topic reference to a real UUID id.
 
@@ -1139,6 +1166,11 @@ async def call_tool(name: str, arguments: dict):
             path = os.path.join(health_dir, 'joy.jsonl')
             rating_str = f'{rating:g}'  # 3.0 -> "3", 3.5 -> "3.5"
             reply = f'Logged joy {rating_str}/5 on {local_date}.'
+
+        if _is_duplicate_health_entry(_last_health_entry(path), entry):
+            return [types.TextContent(type='text', text=(
+                'Skipped — this exact entry was just logged, so it was not '
+                f'recorded again (no double-count). {reply}'))]
 
         with open(path, 'a+') as f:
             # Guard against a prior record that wasn't newline-terminated

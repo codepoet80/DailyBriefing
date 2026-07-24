@@ -54,6 +54,7 @@ src/
   fetch_todos.py       # Runs `checkmate ls` and parses output
   fetch_weather.py     # Open-Meteo API (no key needed), lat/lon from config
   fetch_servers.py     # Fetches status pages, parses btn-success/btn-danger Bootstrap classes
+  fetch_local_services.py # Checks this box's own app servers via `ps aux` / `docker ps`
   fetch_greeting.py    # Time-of-day greeting + ZenQuotes daily quote
   fetch_unifi.py       # Unifi Protect overnight security event summary
   fetch_health.py      # Reads data/health/*.jsonl, returns latest+sparkline+trend per metric
@@ -99,6 +100,11 @@ requirements.txt       # requests, icalendar, recurring_ical_events, feedparser,
   },
   "servers": [
     { "name": "my-site.com", "url": "https://my-site.com/status/" }
+  ],
+  "local_services": [   // app servers on THIS box; type "process" (ps aux) or "docker" (docker ps)
+    { "name": "BlueBubbles", "type": "process", "match": "bluebubbles" },
+    { "name": "Docker",      "type": "process", "match": "docker.app" },
+    { "name": "Plex",        "type": "process", "match": "plex media server" }
   ],
   "weather": {
     "latitude": 41.58,
@@ -197,6 +203,25 @@ def cluster_stories(stories, threshold, importance_threshold) -> (important, reg
 
 Fetches status pages built with [bash-http-monitoring](https://github.com/RaymiiOrg/bash-http-monitoring). Parses `btn-success` / `btn-danger` Bootstrap classes to determine up/down state per service. Displayed as a slim banner (green if all up, amber if any down). Unreachable status pages are treated as a site-level failure.
 
+## Local Services (`fetch_local_services.py`)
+
+Checks that application servers running **on this box** are alive (as opposed to
+`fetch_servers.py`, which polls remote HTTP status pages). Configured via a
+`local_services` list; each entry is one of two check types:
+
+- `process` (default) — the `match` string appears in `ps aux` output
+- `docker` — the `match` string appears in running `docker ps` output
+
+`ps aux` and `docker ps` are each shelled out **at most once per build** and
+reused across all services. Matching is a case-insensitive substring; `match`
+defaults to `name` if omitted. A service whose match is absent is reported down.
+The checker's own PID line is stripped from `ps aux` so a `match` that happens to
+appear in the build process's argv can't self-match. Returns
+`{all_up, services:[{name, up, type}]}`, or None when nothing is configured.
+Rendered as a slim green/amber banner right below the remote Server Status banner
+(reuses the `.section-servers` styles). The `local_services` agent rule pushes a
+priority-1 alert when any service is down.
+
 ## Weather (`fetch_weather.py`)
 
 Uses [Open-Meteo](https://open-meteo.com/) — no API key required. Returns current conditions plus a 5-day forecast. WMO weather code table maps numeric codes to human-readable strings. Displayed collapsed by default showing temp + condition summary.
@@ -209,10 +234,11 @@ Uses [Open-Meteo](https://open-meteo.com/) — no API key required. Returns curr
 
 1. **Verse of the Day** — distinct dark blue banner, serif, centered
 2. **Server Status** — slim green/amber banner; only shown when data present
+2b. **App Services** — slim green/amber banner for this box's local services; only shown when configured
 3. **Weather** — collapsible (collapsed), summary shows temp + condition
 4. **Today** — my calendar, time-sorted, today only
 5. **Check Mate** — top N todos from `checkmate ls`
-6. **Health** — weight / alcohol / exercise / joy. Per metric: latest value, weekly total vs target (or week average for joy), trend badge (good/bad/flat), 30-day sparkline. Joy's sparkline is pinned to a fixed 1..scale_max scale so bar heights read as absolute mood. "Log…" pill highlights anything not logged today.
+6. **Health** — weight / alcohol / exercise / joy. Per metric: latest value, weekly total vs target (or week average for joy), trend badge (good/bad/flat), and a chart. **Weight and joy** show a 30-day daily sparkline (joy pinned to a fixed 1..scale_max scale so bar heights read as absolute mood). **Alcohol and exercise** show a **weekly bar chart** instead (`render_week_bars()`): one bar per Sun–Sat week vs the weekly target line — green = on-target, red = off-target, gray = current in-progress week. "Log…" pill highlights anything not logged today.
 7. **Top Stories** — cross-source clustered news, collapsible (expanded by default)
 8. **More News** — regular feed items, collapsible (collapsed by default)
 9. **Geek News** — HN + Slashdot interleaved, collapsible (collapsed by default)
@@ -281,7 +307,7 @@ The chat agent converts natural language into structured values **in-conversatio
 
 ### Aggregation (`fetch_health.py`)
 
-Called from `build_briefing.py`. Produces per-metric: `latest`, `today_logged`, weekly total (`week_drinks` / `week_minutes`) or average (`week_avg` for joy), 30-day `sparkline` (list of numbers or `null` for "no log"), and `trend` (`good`/`bad`/`flat`).
+Called from `build_briefing.py`. Produces per-metric: `latest`, `today_logged`, weekly total (`week_drinks` / `week_minutes`) or average (`week_avg` for joy), 30-day `sparkline` (list of numbers or `null` for "no log"), and `trend` (`good`/`bad`/`flat`). Alcohol and exercise additionally carry `weekly` — a list of the last `chart_weeks` (default 6) Sun–Sat weeks as `{start, total, partial}` (current week flagged `partial`), computed by `_weekly_totals()` on the same week boundary as `_week_dates()`. This feeds the weekly bar chart in the UI.
 
 **Weekly totals use a Sunday–Saturday calendar week** (`_week_dates()` in `fetch_health.py`), not a rolling 7-day window — a workout on Saturday counts toward that week; Sunday starts a fresh one. The 30-day sparkline still uses a rolling window (`_day_range`).
 
@@ -305,7 +331,9 @@ The target-based design for alcohol/exercise is intentional: slope alone mislead
 
 ### UI
 
-`render_sparkline()` in `index.php` emits a row of `<div class="bar">`s with percentage heights. Old-WebKit safe — no SVG, no canvas. Weight uses tight min-max scaling (small changes visible); alcohol/exercise use 0-baseline (so zero days look like zero); joy uses a fixed 1..scale_max scale (via `$fixed_min`/`$fixed_max`) so a "5" is full height and a "2" is low.
+`render_sparkline()` in `index.php` emits a row of `<div class="bar">`s with percentage heights (weight and joy only). Old-WebKit safe — no SVG, no canvas. Weight uses tight min-max scaling (small changes visible); joy uses a fixed 1..scale_max scale (via `$fixed_min`/`$fixed_max`) so a "5" is full height and a "2" is low.
+
+`render_week_bars()` renders the alcohol/exercise weekly charts. Both the bars and the dashed target line are **absolutely positioned from the same 2px floor over a 28px range**, so a bar of value `v` tops out at exactly `2 + (v/maxv)*28` — the same coordinate the target line uses. (Do not revert the bars to in-flow inline-block: mixing in-flow bars with an absolute target line puts them in different vertical frames and the "above/below target" read drifts by a couple pixels.) Weekly `maxv` gets 1.2× headroom above the taller of the max bar / target.
 
 ## MCP Tools (full inventory)
 
@@ -373,6 +401,7 @@ Each rule shares: `id`, `type`, `enabled`, `pushover_priority` (-1/0/1), `dedupe
 | `calendar` | a "mine" event title matches a keyword within the window | `keywords`, `window_minutes` |
 | `family_calendar` | family events today | — |
 | `server_status` | any monitored server is down | — |
+| `local_services` | an app server on this box (`ps aux`/`docker ps`) is down | — |
 | `security` | overnight Unifi smart-detection of given types | `event_types` |
 | `news_keyword` | a news headline matches | `keywords` |
 | `reading` | no book progressed within `stale_days` (default 3); gated to `hour` | `hour`, `stale_days` |
