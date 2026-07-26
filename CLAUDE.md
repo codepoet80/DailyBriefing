@@ -59,6 +59,7 @@ src/
   fetch_unifi.py       # Unifi Protect overnight security event summary
   fetch_imessage.py    # Overnight iMessage summary via the BlueBubbles server API
   bluebubbles.py       # Shared BlueBubbles REST client (auth, chat/message/contact queries, send)
+  scheduled_send.py    # Detached worker for delayed send_message (survives MCP server teardown)
   fetch_health.py      # Reads data/health/*.jsonl, returns latest+sparkline+trend per metric
   mcp_server.py        # MCP server — exposes briefing + ~17 tools (dialectic, todos, calendar,
                        # message, push, refresh, health logging, get_time, get_public_ip, ...)
@@ -290,7 +291,15 @@ Auth is the server password passed as a `password` query param; every response i
   addresses fall back to `POST /api/v1/chat/new`. Send method comes from
   `bluebubbles.method` — `apple-script` (default, no extra setup; `tempGuid` required)
   or `private-api` (needs the BlueBubbles Private API helper; required for `chat/new`
-  on macOS 11+). `delay_minutes` scheduling is handled in-process by `_send_after_delay`.
+  on macOS 11+). `delay_minutes` scheduling is handled **out of process** by
+  `scheduled_send.py`: because the MCP server is a short-lived stdio subprocess
+  torn down at the end of each chat request, an in-process timer would be killed
+  before it fires. Instead `send_message` writes a job to
+  `data/scheduled_messages/<uuid>.json` and spawns `scheduled_send.py` detached
+  (`start_new_session=True`); the worker sleeps until the due time, reloads
+  config, sends, deletes the job on success (failures stay for inspection and
+  log to `data/scheduled_send.log`). Caveat: a delayed job is a live sleeping
+  process, so it does not survive a machine reboot mid-wait.
 
 ## Web Chat (`web/chat.php` + `src/agent/`)
 

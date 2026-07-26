@@ -19,23 +19,6 @@ CONVERSATIONS_DIR = os.path.join(DATA_DIR, 'conversations')
 
 app = Server('daily-briefing-agent')
 
-# Holds references to in-flight delayed-send tasks so they aren't GC'd
-_pending_tasks: set = set()
-
-
-async def _send_after_delay(delay_seconds: float, bb_cfg: dict, kind: str, target: str,
-                             service: str, message: str, display_name: str):
-    import bluebubbles as bb
-    await asyncio.sleep(delay_seconds)
-    try:
-        if kind == 'chat':
-            bb.send_text(bb_cfg, target, message)
-        else:
-            bb.create_chat(bb_cfg, target, message, service)
-        print(f'[send_message] Sent to {display_name}: {message[:60]}', file=sys.stderr, flush=True)
-    except Exception as e:
-        print(f'[send_message] Failed to send to {display_name}: {e}', file=sys.stderr, flush=True)
-
 
 def _load_briefing():
     try:
@@ -871,13 +854,34 @@ async def call_tool(name: str, arguments: dict):
             except req.exceptions.RequestException as e:
                 return [types.TextContent(type='text', text=f'Error reaching BlueBubbles server: {e}')]
         else:
-            send_at = (datetime.now() + timedelta(minutes=delay_minutes)).replace(second=0, microsecond=0)
-            task = asyncio.create_task(
-                _send_after_delay(delay_minutes * 60, bb_cfg, kind, target, service, message, display_name)
+            import uuid
+            from datetime import timezone
+            send_at = datetime.now() + timedelta(minutes=delay_minutes)
+            # Persist the job and hand it to a DETACHED worker (start_new_session)
+            # rather than an in-process asyncio task: this MCP server is a
+            # short-lived stdio subprocess that gets torn down when the chat
+            # request ends, which would kill any pending in-process timer before
+            # it fires. The worker outlives us and sends at the due time.
+            sched_dir = os.path.join(DATA_DIR, 'scheduled_messages')
+            os.makedirs(sched_dir, exist_ok=True)
+            job = {
+                'send_at': send_at.astimezone(timezone.utc).isoformat(),
+                'kind': kind, 'target': target, 'service': service,
+                'message': message, 'display_name': display_name,
+            }
+            job_path = os.path.join(sched_dir, f'{uuid.uuid4()}.json')
+            with open(job_path, 'w') as f:
+                json.dump(job, f)
+            worker = os.path.join(BASE_DIR, 'src', 'scheduled_send.py')
+            venv_python = os.path.join(BASE_DIR, '.venv', 'bin', 'python3')
+            python = venv_python if os.path.exists(venv_python) else sys.executable
+            log = open(os.path.join(DATA_DIR, 'scheduled_send.log'), 'a')
+            subprocess.Popen(
+                [python, worker, job_path],
+                stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                start_new_session=True, cwd=BASE_DIR,
             )
-            _pending_tasks.add(task)
-            task.add_done_callback(_pending_tasks.discard)
-            when = send_at.strftime('%-I:%M %p')
+            when = send_at.replace(second=0, microsecond=0).strftime('%-I:%M %p')
             return [types.TextContent(type='text', text=f'Scheduled to {display_name} at {when}: {message}')]
 
     if name == 'dialectic_save':

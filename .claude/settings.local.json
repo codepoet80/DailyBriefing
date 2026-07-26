@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import json,os; d=json.load\\(open\\(os.path.expanduser\\('~/.claude.json'\\)\\)\\); print\\('top-level mcpServers:', list\\(d.get\\('mcpServers',{}\\).keys\\(\\)\\)\\); ps=d.get\\('projects',{}\\); print\\('project entries:', [ \\(k, list\\(v.get\\('mcpServers',{}\\).keys\\(\\)\\)\\) for k,v in ps.items\\(\\) if v.get\\('mcpServers'\\)]\\)\")",
+      "Bash(python3 -c \"import json; json.load\\(open\\('/Users/jonwise/.claude/settings.json'\\)\\); print\\('settings.json: valid'\\)\")",
+      "Bash(python3 -c \"import json; json.load\\(open\\('/Users/jonwise/Websites/DailyBriefing/.mcp.json'\\)\\); print\\('.mcp.json: valid'\\)\")",
+      "Bash(npm config *)",
+      "Bash(ls -ld \"$\\(npm config get prefix 2>/dev/null\\)/lib/node_modules\")",
+      "Bash(npm --version)",
+      "Bash([ -w \"$PFX/lib/node_modules\" ])",
+      "Read(//Users/jonwise/.local/share/claude/versions/**)",
+      "Bash(claude install *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Read(//tmp/**)",
+      "Bash(./run.sh)",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('data/briefing.json'\\)\\); print\\(json.dumps\\(d.get\\('weather', {}\\), indent=2\\)\\)\")",
+      "Bash(python3 src/fetch_weather.py)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "daily-briefing"
+  ]
+}
