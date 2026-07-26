@@ -57,6 +57,8 @@ src/
   fetch_local_services.py # Checks this box's own app servers via `ps aux` / `docker ps`
   fetch_greeting.py    # Time-of-day greeting + ZenQuotes daily quote
   fetch_unifi.py       # Unifi Protect overnight security event summary
+  fetch_imessage.py    # Overnight iMessage summary via the BlueBubbles server API
+  bluebubbles.py       # Shared BlueBubbles REST client (auth, chat/message/contact queries, send)
   fetch_health.py      # Reads data/health/*.jsonl, returns latest+sparkline+trend per metric
   mcp_server.py        # MCP server — exposes briefing + ~17 tools (dialectic, todos, calendar,
                        # message, push, refresh, health logging, get_time, get_public_ip, ...)
@@ -132,6 +134,14 @@ requirements.txt       # requests, icalendar, recurring_ical_events, feedparser,
     "password": "...",
     "night_start_hour": 22,    // overnight window start (default 10pm)
     "night_end_hour": 6        // overnight window end (default 6am)
+  },
+  "bluebubbles": {
+    "url": "http://localhost:1234",
+    "password": "...",         // BlueBubbles server password (Settings > API & Webhooks)
+    "method": "apple-script",  // send method: "apple-script" (default) or "private-api"
+    "night_start_hour": 22,    // overnight message summary window
+    "night_end_hour": 6,
+    "night_end_minute": 30
   },
   "todos": {
     "command": "checkmate ls", // any CLI that outputs "○ N. Title" lines
@@ -259,6 +269,29 @@ Time-of-day salutation (Good morning/afternoon/evening) using the name from `gre
 
 Fetches events from Unifi Protect's local REST API for a configurable overnight window (default 10pm–6am). Authenticates with username/password; requires `X-CSRF-Token` header on subsequent requests. Summarises smart detections (Person, Vehicle, etc.) and motion counts per camera. Section hidden if no overnight events.
 
+## Messaging (`bluebubbles.py` + `fetch_imessage.py`)
+
+Both the overnight-message summary and the `send_message` MCP tool talk to a local
+[BlueBubbles](https://bluebubbles.app) server ([REST API docs](https://docs.bluebubbles.app/server/developer-guides/rest-api-and-webhooks)).
+Auth is the server password passed as a `password` query param; every response is a
+`{status, message, data}` envelope that `bluebubbles._request()` unwraps.
+
+- **`fetch_imessage.py`** — POSTs `/api/v1/message/query` with `after` = the overnight
+  window start (epoch **ms**) and `with: [chat, chat.participants, handle]`, drops
+  `isFromMe` messages, and groups the rest by chat. `count` is total incoming messages;
+  `messages` is one row per thread (newest message as preview). Contact names come from
+  `GET /api/v1/contact`, matched on normalized addresses (digits-only phones, US country
+  code stripped). Output shape `{window_label, count, messages:[{name, service, time, preview}]}`
+  is unchanged from the old bridge, so `index.php` renders it as-is.
+- **`send_message`** — resolves the recipient via `POST /api/v1/chat/query`
+  (`sort: lastmessage`, `with: [participants]`): names substring-match group display
+  names or participant contact names; phones/emails match single-participant chats.
+  Existing chats send via `POST /api/v1/message/text` (`chatGuid` + `tempGuid`); unknown
+  addresses fall back to `POST /api/v1/chat/new`. Send method comes from
+  `bluebubbles.method` — `apple-script` (default, no extra setup; `tempGuid` required)
+  or `private-api` (needs the BlueBubbles Private API helper; required for `chat/new`
+  on macOS 11+). `delay_minutes` scheduling is handled in-process by `_send_after_delay`.
+
 ## Web Chat (`web/chat.php` + `src/agent/`)
 
 A chat box at the bottom of `index.php` lets legacy devices (e.g. the 2011 webOS TouchPad) talk to the same MCP tool surface the desktop session uses. **Tool logic is not duplicated** — the chat handler spawns `src/mcp_server.py` as a stdio MCP subprocess and forwards calls.
@@ -345,7 +378,7 @@ Defined in `src/mcp_server.py`. The desktop session has all of them; the web cha
 | `add_todo` | Append via `checkmate add` |
 | `add_calendar_event` | Create a CalDAV event on any `writable: true` calendar |
 | `send_notification` | Push via Pushover (priority -1/0/1) |
-| `send_message` | iMessage/SMS via the message-bridge sidecar, optional `delay_minutes` |
+| `send_message` | iMessage/SMS via the local BlueBubbles server, optional `delay_minutes` |
 | `dialectic_save` / `_append` / `_list` / `_get` / `_summary` / `_close` / `_resume` | See Dialectics section. `_summary` returns compact recap (first + last N turns) — use for "what was that about"-style asks. |
 | `log_weight` / `log_alcohol` / `log_exercise` / `log_joy` | Append to `data/health/*.jsonl` |
 | `get_health_summary` | Live read of `data/health/*.jsonl`, returns compact stats |

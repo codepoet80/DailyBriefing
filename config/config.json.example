@@ -81,8 +81,10 @@
     "night_start_hour": 22,
     "night_end_hour": 6
   },
-  "imessage": {
-    "url": "http://192.168.10.3:8080",
+  "bluebubbles": {
+    "url": "http://localhost:1234",
+    "password": "your_bluebubbles_server_password",
+    "method": "apple-script",
     "night_start_hour": 22,
     "night_end_hour": 6,
     "night_end_minute": 30
