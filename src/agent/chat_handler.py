@@ -116,7 +116,7 @@ def _build_stable_system_text(config):
         "- reading: {stagnant: [{title, days_since}, ...], all: [...]}\n"
         "- unifi: overnight security event summary {total_events, smart, motion, "
         "cameras: [...], window_label}\n"
-        "- imessage: overnight message summary {count, threads: [...], window_label}\n"
+        "- imessage: overnight message summary {count, messages: [{name, service, time, preview}], window_label}\n"
         "- xkcd: today's comic if new\n"
         "- generated_at, run_type: when the data was produced and which cron run "
         "(morning, midday, afternoon, evening)\n"
