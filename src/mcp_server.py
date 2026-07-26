@@ -23,15 +23,14 @@ app = Server('daily-briefing-agent')
 _pending_tasks: set = set()
 
 
-async def _send_after_delay(delay_seconds: float, bb_cfg: dict, kind: str, target: str,
-                             service: str, message: str, display_name: str):
-    import bluebubbles as bb
+async def _send_after_delay(delay_seconds: float, bridge_url: str, address: str,
+                             is_reply: bool, service: str, message: str, display_name: str):
+    import requests as req
     await asyncio.sleep(delay_seconds)
     try:
-        if kind == 'chat':
-            bb.send_text(bb_cfg, target, message)
-        else:
-            bb.create_chat(bb_cfg, target, message, service)
+        payload = {'address': address, 'isReply': is_reply, 'service': service, 'message': message}
+        r = req.post(bridge_url + '/chats', json=payload, timeout=10)
+        r.raise_for_status()
         print(f'[send_message] Sent to {display_name}: {message[:60]}', file=sys.stderr, flush=True)
     except Exception as e:
         print(f'[send_message] Failed to send to {display_name}: {e}', file=sys.stderr, flush=True)
@@ -438,8 +437,8 @@ async def list_tools():
         types.Tool(
             name='send_message',
             description=(
-                'Send an iMessage/SMS via the local BlueBubbles server. '
-                'Recipient can be a name (matched against recent chats and contacts) or a phone number/email. '
+                'Send an iMessage/SMS via the local message bridge. '
+                'Recipient can be a name (matched against recent chats) or a phone number/email. '
                 'Use delay_minutes to schedule the send for later.'
             ),
             inputSchema={
@@ -452,7 +451,7 @@ async def list_tools():
                     'message': {'type': 'string', 'description': 'Message text'},
                     'service': {
                         'type': 'string',
-                        'description': 'iMessage or SMS (only needed for new threads)',
+                        'description': 'iMessage, SMS, or RCS (only needed for new threads)',
                         'default': 'iMessage',
                     },
                     'delay_minutes': {
@@ -831,7 +830,6 @@ async def call_tool(name: str, arguments: dict):
 
     if name == 'send_message':
         from datetime import datetime, timedelta
-        import bluebubbles as bb
         recipient = arguments.get('recipient', '').strip()
         message = arguments.get('message', '').strip()
         service = arguments.get('service', 'iMessage')
@@ -839,41 +837,50 @@ async def call_tool(name: str, arguments: dict):
 
         if not recipient or not message:
             return [types.TextContent(type='text', text='Error: recipient and message are required')]
-        if service not in ('iMessage', 'SMS'):
-            return [types.TextContent(type='text', text='Error: service must be iMessage or SMS')]
+        if service not in ('iMessage', 'SMS', 'RCS'):
+            return [types.TextContent(type='text', text='Error: service must be iMessage, SMS, or RCS')]
 
-        bb_cfg = bb.get_bb_config(config)
-        if not bb_cfg:
-            return [types.TextContent(type='text', text='Error: bluebubbles.url / bluebubbles.password not set in config.json')]
+        bridge_cfg = config.get('imessage', {})
+        bridge_url = bridge_cfg.get('url', '').rstrip('/')
+        if not bridge_url:
+            return [types.TextContent(type='text', text='Error: imessage.url not set in config.json')]
 
-        try:
-            kind, target, display_name = bb.resolve_recipient(bb_cfg, recipient)
-        except ValueError as e:
-            return [types.TextContent(type='text', text=str(e))]
-        except req.exceptions.RequestException as e:
-            return [types.TextContent(type='text', text=f'Error reaching BlueBubbles server: {e}')]
+        # Resolve a name to a replyId by searching recent chats
+        address = recipient
+        is_reply = False
+        display_name = recipient
+        phone_like = recipient.startswith('+') or recipient.replace('-', '').replace(' ', '').isdigit()
+        email_like = '@' in recipient
+        if not phone_like and not email_like:
+            try:
+                resp = req.get(bridge_url + '/chats', params={'limit': 50}, timeout=10)
+                resp.raise_for_status()
+                chats = resp.json()
+                name_lower = recipient.lower()
+                match = next((c for c in chats if name_lower in c.get('name', '').lower()), None)
+                if match:
+                    address = match['replyId']
+                    is_reply = True
+                    display_name = match['name']
+                else:
+                    return [types.TextContent(type='text', text=f'No chat found matching "{recipient}". Use a phone number or email to start a new thread.')]
+            except req.exceptions.RequestException as e:
+                return [types.TextContent(type='text', text=f'Error reaching message bridge: {e}')]
 
         if delay_minutes <= 0:
             try:
-                if kind == 'chat':
-                    bb.send_text(bb_cfg, target, message)
-                else:
-                    bb.create_chat(bb_cfg, target, message, service)
+                payload = {'address': address, 'isReply': is_reply, 'service': service, 'message': message}
+                r = req.post(bridge_url + '/chats', json=payload, timeout=10)
+                r.raise_for_status()
                 return [types.TextContent(type='text', text=f'Sent to {display_name}: {message}')]
-            except req.exceptions.HTTPError as e:
-                detail = ''
-                try:
-                    body = e.response.json()
-                    detail = body.get('error', {}).get('message') or body.get('message', '')
-                except Exception:
-                    pass
-                return [types.TextContent(type='text', text=f'BlueBubbles error: HTTP {e.response.status_code} {detail}'.strip())]
+            except req.exceptions.HTTPError:
+                return [types.TextContent(type='text', text=f'Bridge error: HTTP {r.status_code}')]
             except req.exceptions.RequestException as e:
-                return [types.TextContent(type='text', text=f'Error reaching BlueBubbles server: {e}')]
+                return [types.TextContent(type='text', text=f'Error reaching message bridge: {e}')]
         else:
             send_at = (datetime.now() + timedelta(minutes=delay_minutes)).replace(second=0, microsecond=0)
             task = asyncio.create_task(
-                _send_after_delay(delay_minutes * 60, bb_cfg, kind, target, service, message, display_name)
+                _send_after_delay(delay_minutes * 60, bridge_url, address, is_reply, service, message, display_name)
             )
             _pending_tasks.add(task)
             task.add_done_callback(_pending_tasks.discard)

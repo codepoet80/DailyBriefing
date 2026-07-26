@@ -1,19 +1,20 @@
+import requests
 from datetime import datetime, timedelta
-
-from bluebubbles import (
-    get_bb_config, query_messages, contact_name_map,
-    chat_display_name, chat_service, normalize_address,
-)
 
 
 def fetch_imessage(config):
-    cfg = get_bb_config(config)
+    cfg = config.get('imessage', {})
     if not cfg:
         return None
 
-    night_start   = cfg.get('night_start_hour', 22)
-    night_end     = cfg.get('night_end_hour', 6)
-    night_end_min = cfg.get('night_end_minute', 30)
+    url = cfg.get('url', '').rstrip('/')
+    if not url:
+        print('    Warning: imessage config missing url, skipping')
+        return None
+
+    night_start     = cfg.get('night_start_hour', 22)
+    night_end       = cfg.get('night_end_hour', 6)
+    night_end_min   = cfg.get('night_end_minute', 30)
 
     now   = datetime.now()
     today = now.date()
@@ -23,47 +24,31 @@ def fetch_imessage(config):
     print('    Night window: ' + window_start.strftime('%a %-I:%M %p') + ' - ' + window_end.strftime('%-I:%M %p'))
 
     try:
-        messages = query_messages(cfg, window_start.timestamp() * 1000)
-        names = contact_name_map(cfg)
+        resp = requests.get(url + '/chats', timeout=10)
+        resp.raise_for_status()
+        chats = resp.json()
     except Exception as e:
-        print('    Warning: BlueBubbles fetch failed: ' + str(e))
+        print('    Warning: iMessage bridge fetch failed: ' + str(e))
         return None
 
-    # Group incoming messages by chat; keep the newest as the preview
-    # (query returns newest-first, so the first message seen per chat wins).
-    threads = {}
-    total = 0
-    for msg in messages:
-        if msg.get('isFromMe'):
+    overnight = []
+    for chat in chats:
+        received_str = chat.get('lastReceived', '')
+        if not received_str:
             continue
-        received = datetime.fromtimestamp(msg.get('dateCreated', 0) / 1000.0)
-        if not (window_start <= received <= window_end):
+        try:
+            received = datetime.strptime(received_str, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
             continue
-        total += 1
+        if window_start <= received <= window_end:
+            overnight.append({
+                'name':    chat.get('name', 'Unknown'),
+                'service': chat.get('service', ''),
+                'time':    received.strftime('%-I:%M %p'),
+                'preview': chat.get('lastMessage', '')[:80],
+            })
 
-        chats = msg.get('chats') or []
-        chat = chats[0] if chats else {}
-        key = chat.get('guid') or normalize_address((msg.get('handle') or {}).get('address'))
-        if key in threads:
-            continue
-
-        if chat:
-            name = chat_display_name(chat, names)
-        else:
-            addr = (msg.get('handle') or {}).get('address', 'Unknown')
-            name = names.get(normalize_address(addr), addr)
-
-        threads[key] = {
-            'name':     name,
-            'service':  chat_service(chat),
-            'received': received,
-            'time':     received.strftime('%-I:%M %p'),
-            'preview':  (msg.get('text') or '[attachment]')[:80],
-        }
-
-    overnight = sorted(threads.values(), key=lambda x: x['received'])
-    for t in overnight:
-        del t['received']
+    overnight.sort(key=lambda x: x['time'])
 
     # Build label like "10pm–6:30am"
     start_label = window_start.strftime('%-I%p').lower()
@@ -71,12 +56,13 @@ def fetch_imessage(config):
         end_label = window_end.strftime('%-I:%M%p').lower()
     else:
         end_label = window_end.strftime('%-I%p').lower()
-    window_label = start_label + '–' + end_label
+    window_label = start_label + '\u2013' + end_label
 
-    print('    ' + str(total) + ' messages overnight in ' + str(len(overnight)) + ' threads')
+    count = len(overnight)
+    print('    ' + str(count) + ' messages overnight')
 
     return {
         'window_label': window_label,
-        'count': total,
+        'count': count,
         'messages': overnight,
     }
