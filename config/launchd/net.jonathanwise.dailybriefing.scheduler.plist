@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Sweeps data/scheduled_messages/ every 10 minutes and delivers anything due.
+  Install:
+    cp config/launchd/net.jonathanwise.dailybriefing.scheduler.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/net.jonathanwise.dailybriefing.scheduler.plist
+  Reload after editing:
+    launchctl bootout gui/$(id -u)/net.jonathanwise.dailybriefing.scheduler
+  Run one sweep by hand:
+    launchctl kickstart -p gui/$(id -u)/net.jonathanwise.dailybriefing.scheduler
+
+  StartInterval (not StartCalendarInterval) so a sweep missed while the Mac
+  slept runs promptly on wake instead of being skipped until the next slot.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>net.jonathanwise.dailybriefing.scheduler</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/var/www/DailyBriefing/.venv/bin/python3</string>
+        <string>/opt/homebrew/var/www/DailyBriefing/src/scheduled_send.py</string>
+        <string>sweep</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/opt/homebrew/var/www/DailyBriefing</string>
+
+    <key>StartInterval</key>
+    <integer>600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/opt/homebrew/var/www/DailyBriefing/data/scheduled_send.log</string>
+    <key>StandardErrorPath</key>
+    <string>/opt/homebrew/var/www/DailyBriefing/data/scheduled_send.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LowPriorityIO</key>
+    <true/>
+</dict>
+</plist>

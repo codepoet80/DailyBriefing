@@ -3,10 +3,26 @@
     "name": "Your Name"
   },
   "local_services": [
-    { "name": "BlueBubbles", "type": "process", "match": "bluebubbles" },
-    { "name": "Docker",      "type": "process", "match": "docker.app" },
-    { "name": "Plex",        "type": "process", "match": "plex media server" },
-    { "name": "MyContainer", "type": "docker",  "match": "my-container-name" }
+    {
+      "name": "BlueBubbles",
+      "type": "process",
+      "match": "bluebubbles"
+    },
+    {
+      "name": "Docker",
+      "type": "process",
+      "match": "docker.app"
+    },
+    {
+      "name": "Plex",
+      "type": "process",
+      "match": "plex media server"
+    },
+    {
+      "name": "MyContainer",
+      "type": "docker",
+      "match": "my-container-name"
+    }
   ],
   "weather": {
     "latitude": 0.0,
@@ -84,7 +100,7 @@
   "bluebubbles": {
     "url": "http://localhost:1234",
     "password": "your_bluebubbles_server_password",
-    "method": "apple-script",
+    "method": "private-api",
     "night_start_hour": 22,
     "night_end_hour": 6,
     "night_end_minute": 30
@@ -95,6 +111,13 @@
     "count": 8
   },
   "reading": {
+    "mode": "account",
+    "account": {
+      "login": "you@example.com",
+      "password": "",
+      "app_id": "com.palm.codepoet.papyrus",
+      "device_name": "DailyBriefing"
+    },
     "papyrus_dir": "~/ownCloud/Dropbox/.papyrus",
     "stagnant_days": 5,
     "max_inactive_days": 30,
@@ -163,5 +186,15 @@
       "get_health_summary"
     ],
     "system_prompt_extra": ""
+  },
+  "contacts": {
+    "couple_gender": {
+      "alex": "m",
+      "sam": "m",
+      "chris": "m",
+      "dana": "f",
+      "robin": "f",
+      "jo": "f"
+    }
   }
 }

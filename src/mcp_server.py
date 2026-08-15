@@ -14,6 +14,9 @@ from mcp import types
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 DATA_DIR = os.path.join(BASE_DIR, 'data')
+# Keep in step with scheduled_send.SWEEP_INTERVAL / the launchd StartInterval.
+# Delays below this get a precise one-shot timer as well as the sweep.
+SWEEP_INTERVAL_MINUTES = 10
 CONFIG_DIR = os.path.join(BASE_DIR, 'config')
 CONVERSATIONS_DIR = os.path.join(DATA_DIR, 'conversations')
 
@@ -831,6 +834,14 @@ async def call_tool(name: str, arguments: dict):
 
         try:
             kind, target, display_name = bb.resolve_recipient(bb_cfg, recipient)
+        except bb.AmbiguousRecipient as e:
+            lines = [f'Ambiguous recipient — {e.reason}', '']
+            for opt in e.options:
+                label = f' ({opt["label"]})' if opt.get('label') else ''
+                lines.append(f'  • {opt["name"]}{label}: {opt["address"]}')
+            lines.append('')
+            lines.append('Nothing sent. Re-run with the exact name or the phone number.')
+            return [types.TextContent(type='text', text='\n'.join(lines))]
         except ValueError as e:
             return [types.TextContent(type='text', text=str(e))]
         except req.exceptions.RequestException as e:
@@ -857,32 +868,45 @@ async def call_tool(name: str, arguments: dict):
             import uuid
             from datetime import timezone
             send_at = datetime.now() + timedelta(minutes=delay_minutes)
-            # Persist the job and hand it to a DETACHED worker (start_new_session)
-            # rather than an in-process asyncio task: this MCP server is a
-            # short-lived stdio subprocess that gets torn down when the chat
-            # request ends, which would kill any pending in-process timer before
-            # it fires. The worker outlives us and sends at the due time.
+            # Write the job and stop. Delivery is the launchd sweeper's problem
+            # (src/scheduled_send.py, every 10 min) — it survives reboots,
+            # retries, and reports failures. The old design spawned a detached
+            # process that slept until the due time and sent exactly once; when
+            # that send failed the message was simply lost, silently.
             sched_dir = os.path.join(DATA_DIR, 'scheduled_messages')
             os.makedirs(sched_dir, exist_ok=True)
             job = {
                 'send_at': send_at.astimezone(timezone.utc).isoformat(),
                 'kind': kind, 'target': target, 'service': service,
                 'message': message, 'display_name': display_name,
+                'attempts': 0,
             }
             job_path = os.path.join(sched_dir, f'{uuid.uuid4()}.json')
             with open(job_path, 'w') as f:
                 json.dump(job, f)
-            worker = os.path.join(BASE_DIR, 'src', 'scheduled_send.py')
-            venv_python = os.path.join(BASE_DIR, '.venv', 'bin', 'python3')
-            python = venv_python if os.path.exists(venv_python) else sys.executable
-            log = open(os.path.join(DATA_DIR, 'scheduled_send.log'), 'a')
-            subprocess.Popen(
-                [python, worker, job_path],
-                stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                start_new_session=True, cwd=BASE_DIR,
-            )
+
+            # A delay shorter than the sweep interval also gets a one-shot timer
+            # so it lands on time instead of waiting for the next sweep. This is
+            # punctuality only: the job file stays until delivery is CONFIRMED,
+            # so if this process dies the sweeper still delivers, and the two
+            # cannot double-send (both check history first, under one lock).
+            precise = delay_minutes < SWEEP_INTERVAL_MINUTES
+            if precise:
+                worker = os.path.join(BASE_DIR, 'src', 'scheduled_send.py')
+                venv_python = os.path.join(BASE_DIR, '.venv', 'bin', 'python3')
+                python = venv_python if os.path.exists(venv_python) else sys.executable
+                log = open(os.path.join(DATA_DIR, 'scheduled_send.log'), 'a')
+                subprocess.Popen(
+                    [python, worker, 'once', job_path],
+                    stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                    start_new_session=True, cwd=BASE_DIR,
+                )
+
             when = send_at.replace(second=0, microsecond=0).strftime('%-I:%M %p')
-            return [types.TextContent(type='text', text=f'Scheduled to {display_name} at {when}: {message}')]
+            precision = 'at' if precise else f'within {SWEEP_INTERVAL_MINUTES} min of'
+            return [types.TextContent(
+                type='text',
+                text=f'Scheduled to {display_name} {precision} {when}: {message}')]
 
     if name == 'dialectic_save':
         import uuid

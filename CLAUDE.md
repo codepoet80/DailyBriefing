@@ -59,8 +59,12 @@ src/
   fetch_unifi.py       # Unifi Protect overnight security event summary
   fetch_imessage.py    # Overnight iMessage summary via the BlueBubbles server API
   bluebubbles.py       # Shared BlueBubbles REST client (auth, chat/message/contact queries, send)
-  scheduled_send.py    # Detached worker for delayed send_message (survives MCP server teardown)
+  contacts_mac.py      # Name -> number lookup from this Mac's Contacts (labels, couple convention)
+  scheduled_send.py    # launchd-driven sweeper for delayed send_message (retry + delivery confirmation)
   fetch_health.py      # Reads data/health/*.jsonl, returns latest+sparkline+trend per metric
+  fetch_reading.py     # Papyrus eReader book progress (webOS Account sync, or legacy local dir)
+  webos_account.py     # Read-only client for the webOS Archive app-storage service
+                       # (auth + scrambled-record decode; port of the community JS SDK)
   mcp_server.py        # MCP server — exposes briefing + ~17 tools (dialectic, todos, calendar,
                        # message, push, refresh, health logging, get_time, get_public_ip, ...)
   run_agent.py         # Proactive Pushover agent (rules-based, runs after every build)
@@ -151,6 +155,19 @@ requirements.txt       # requests, icalendar, recurring_ical_events, feedparser,
   "calendar_filters": {
     "exclude_titles": ["Morning Routine"]  // exact-match event titles to suppress
   },
+  "reading": {
+    "mode": "account",         // "account" (webOS Account sync) or "webdav" (legacy local dir)
+    "account": {
+      "login": "you@example.com",   // webOS Account email
+      "password": "",               // webOS Account password
+      "app_id": "com.palm.codepoet.papyrus",
+      "device_name": "DailyBriefing"  // label in the account's device list
+    },
+    "papyrus_dir": "~/ownCloud/Dropbox/.papyrus",  // mode "webdav" only
+    "stagnant_days": 7,        // days without progress before a book reads as stagnant
+    "max_inactive_days": 30,   // books untouched longer than this are dropped
+    "exclude_titles": []
+  },
   "health": {
     "weight":   { "unit": "lbs", "goal_direction": "down" },
     "alcohol":  { "weekly_target_drinks": 15 },
@@ -237,6 +254,64 @@ priority-1 alert when any service is down.
 
 Uses [Open-Meteo](https://open-meteo.com/) — no API key required. Returns current conditions plus a 5-day forecast. WMO weather code table maps numeric codes to human-readable strings. Displayed collapsed by default showing temp + condition summary.
 
+## Reading Progress (`fetch_reading.py` + `webos_account.py`)
+
+Book progress comes from the [Papyrus eReader](https://github.com/codepoet80/webos-papyrus-ereader)
+running on webOS. `reading.mode` picks the source:
+
+- **`account`** (default) — the webOS Account cloud storage run by the community's
+  webOS Archive service. This is what Papyrus's `syncMode: "account"` writes to.
+- **`webdav`** (legacy) — per-book JSON files in a locally synced `.papyrus`
+  directory. This was the original path; it only works while some other process
+  (ownCloud/Dropbox client) is still syncing that folder down.
+
+Both yield the same output — `{books: [...], stagnant: [...]}`, one entry per book
+with `title`, `author`, `percent`, `days_since`, `last_read_label`, `stagnant` —
+consumed by `web/index.php` and the `reading` agent rule.
+
+### The account protocol
+
+`webos_account.py` is a **read-only Python port** of the read path of the
+community JS SDK (`webos-common/AppStorage/webos-app-storage.js`, vendored in
+Papyrus as `app/app/common/webos-app-storage.js`). Service base is
+`https://appcatalog.webosarchive.org/WebService`:
+
+| Call | Purpose |
+|---|---|
+| `POST device.php?m=authenticateWeb` | `{login, password, device_id, device_name}` → `{token, account}`; token is good for 365 days |
+| `GET storage.php?m=getAll&app_id=…` | → `{items: [{key, value, revision, updated_at}], usage}` |
+
+Every request carries `Authorization: PalmAuth token=<token>` and
+`X-Palm-Device-Id`.
+
+**Record values are scrambled client-side** with XXTEA, keyed on
+`app_id + ":" + record_key`, base64'd behind a `v1:` prefix. The master key is
+public by design (it ships in the JS) — it is obfuscation on a shared server, not
+encryption. `webos_account.scramble()` / `unscramble()` reproduce it exactly; the
+port is verified byte-for-byte against the original JS.
+
+**Book keys are opaque.** The SDK only scrambles values, so Papyrus scrambles the
+key itself (`SyncManager._scrambledBookKey`, salt `papyrus_book_key_v1`,
+URL-safe base64) to keep titles and ISBNs off a shared server. That means you
+**cannot look a book up by name** — `fetch_reading` calls `getAll`, keeps records
+whose key starts with `book:`, and reads title/author out of the decoded *value*.
+The app's `settings` record is skipped, as is any blob that fails to unscramble.
+
+### Auth lifecycle
+
+On webOS the device adopts its own account token over the Luna bus. Off-device
+there is no Luna bus, so this client signs in with the account email/password from
+config and caches `{token, device_id, account}` in `data/webos_session.json`
+(mode `0600`; `data/*` is gitignored). The **`device_id` is generated once and
+reused** — a fresh one per run would litter the account's device list with a new
+revocable entry every hour.
+
+A cached token can be revoked server-side (signing the device out of its webOS
+Account kills it — see Papyrus fix #30), which surfaces as a 401. `fetch_reading`
+catches that, re-signs-in once, and retries. Any other failure — bad credentials,
+service unreachable, no credentials configured — logs a line and returns `None`,
+so the briefing build continues and the Reading section simply drops out.
+
 ## XKCD State (`fetch_xkcd.py`)
 
 `data/xkcd_state.json` persists the last-seen comic number. The state file is only updated when the comic is **not** new, so a new comic stays visible across the day's runs until the next one publishes.
@@ -284,22 +359,164 @@ Auth is the server password passed as a `password` query param; every response i
   `GET /api/v1/contact`, matched on normalized addresses (digits-only phones, US country
   code stripped). Output shape `{window_label, count, messages:[{name, service, time, preview}]}`
   is unchanged from the old bridge, so `index.php` renders it as-is.
-- **`send_message`** — resolves the recipient via `POST /api/v1/chat/query`
-  (`sort: lastmessage`, `with: [participants]`): names substring-match group display
-  names or participant contact names; phones/emails match single-participant chats.
-  Existing chats send via `POST /api/v1/message/text` (`chatGuid` + `tempGuid`); unknown
-  addresses fall back to `POST /api/v1/chat/new`. Send method comes from
-  `bluebubbles.method` — `apple-script` (default, no extra setup; `tempGuid` required)
-  or `private-api` (needs the BlueBubbles Private API helper; required for `chat/new`
-  on macOS 11+). `delay_minutes` scheduling is handled **out of process** by
-  `scheduled_send.py`: because the MCP server is a short-lived stdio subprocess
-  torn down at the end of each chat request, an in-process timer would be killed
-  before it fires. Instead `send_message` writes a job to
-  `data/scheduled_messages/<uuid>.json` and spawns `scheduled_send.py` detached
-  (`start_new_session=True`); the worker sleeps until the due time, reloads
-  config, sends, deletes the job on success (failures stay for inspection and
-  log to `data/scheduled_send.log`). Caveat: a delayed job is a live sleeping
-  process, so it does not survive a machine reboot mid-wait.
+- **`send_message`** — see Recipient Resolution below. Existing chats send via
+  `POST /api/v1/message/text` (`chatGuid` + `tempGuid`); unknown addresses fall back
+  to `POST /api/v1/chat/new`. Send method comes from
+  `bluebubbles.method` — **`private-api`** (current setting; needs the BlueBubbles
+  Private API helper, which also makes `chat/new` work on macOS 11+) or
+  `apple-script` (no extra setup, but prone to hanging — see Delayed Sends).
+  Confirm the helper is live with `GET /api/v1/server/info` →
+  `private_api: true, helper_connected: true`. `delay_minutes` scheduling is
+  covered in Delayed Sends below.
+
+## Delayed Sends (`scheduled_send.py` + launchd)
+
+`send_message` with `delay_minutes` **only writes a job file** —
+`data/scheduled_messages/<uuid>.json`. Delivery belongs to a launchd agent that
+sweeps that directory **every 10 minutes**:
+
+```
+config/launchd/net.jonathanwise.dailybriefing.scheduler.plist   # StartInterval 600
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/net.jonathanwise.dailybriefing.scheduler.plist
+launchctl kickstart -p gui/$(id -u)/net.jonathanwise.dailybriefing.scheduler   # sweep now
+```
+
+So a message is sent within 10 minutes of its due time, not to the second.
+`StartInterval` (not `StartCalendarInterval`) so a sweep missed while the Mac
+slept runs on wake instead of being skipped.
+
+### Why it works this way
+
+The original design spawned a detached process that slept until the due time and
+sent **once**. Timing was never the problem — on 2026-08-10 two jobs fired within
+a second of schedule. Delivery was: both timed out at the old 30s limit, and
+because nothing retried, watched, or reported, one message was never delivered at
+all and the other surfaced three days later when the stuck AppleScript call
+finally completed. The sweep model exists to close each of those gaps.
+
+### The rules that keep retrying safe
+
+- **A timeout is an unknown, not a failure.** BlueBubbles can time out
+  client-side while the send is still moving inside Messages.
+- **Accepted ≠ delivered.** HTTP 200 only means the request was accepted; an
+  undeliverable send returns 200 and then lands with `error=4` and no
+  `dateDelivered`. `confirm_send()` polls the history briefly after every send;
+  only `error == 0` counts. A row with a non-zero error is a *failure*, so
+  `already_delivered` must never treat it as proof.
+- **Match on recipient, not chat guid.** iMessage re-routes a send to its
+  canonical thread — aim at `RCS;-;+1206…` and it can land in
+  `iMessage;-;+1206…`. Address comes from parsing the chat guid
+  (`SERVICE;-;ADDRESS`), because `message/query` returns `participants` **empty**
+  even when `with: [chat.participants]` is requested. Requiring guid equality
+  made real deliveries look unconfirmed and produced a duplicate resend in
+  testing.
+- **Match across every handle that reaches the person**
+  (`equivalent_addresses()`, built from Contacts). iMessage delivers to an
+  *Apple ID*, not to the handle you addressed: a message sent to someone's work
+  number lands in the iMessage thread for their mobile. Comparing only the
+  target handle marked a delivered message unconfirmed and the next sweep sent
+  it again — this shipped and put two copies in a thread before it was caught.
+  Matching stays tight across *different* people; only handles Contacts groups
+  under one person are treated as equivalent.
+- **An accepted send is not retried on the next sweep.** Once the server
+  accepts a send, the job records `accepted_at`; for `RESEND_GRACE` (30 min)
+  afterwards a still-unconfirmed job waits rather than re-sending, unless an
+  errored copy is actually visible. Accepted-but-unseen is far more often
+  in-flight than lost, and re-sending is what duplicates.
+
+### You cannot pick which handle an iMessage contact receives on
+
+If a number belongs to a contact who has iMessage, Apple routes the message to
+their Apple ID regardless of the thread you send to. Sending to a work number
+and having it arrive on the mobile is Apple's behaviour, not a bug in this code.
+Addressing the SMS thread does **not** override this: a send addressed to the
+SMS thread for a work number was still delivered to the iMessage thread for that
+person's mobile. The chat
+guid selects a thread, not a transport — Messages picks iMessage whenever the
+recipient's Apple ID is reachable. Short of disabling iMessage for that account,
+a specific non-Apple-ID handle is not addressable from here.
+
+### Job lifecycle
+
+| Outcome | What happens |
+|---|---|
+| not yet due | left alone |
+| already in history, `error == 0` | closed out, moved to `expired/` — never re-sent |
+| sent and confirmed | job deleted |
+| accepted, unconfirmed | left pending; next sweep re-checks delivery *before* retrying |
+| send failed | attempt counted, retried next sweep, up to `MAX_ATTEMPTS` (5) → `failed/` + priority-1 Pushover |
+| due more than `MAX_LATE` (2h) ago | `expired/` + priority-1 Pushover, **not** sent — no reminder arrives days late |
+
+Terminal outcomes move the file to `failed/` or `expired/` rather than deleting,
+so nothing vanishes silently. A `flock` on `.sweep.lock` keeps overlapping sweeps
+from double-sending.
+
+## Recipient Resolution (`contacts_mac.py` + `bluebubbles.resolve_recipient`)
+
+Turning "text Dana Rivera" into a send target. `resolve_recipient` returns
+`(kind, target, display_name)` — `kind` is `chat` (target is a chat guid) or `new`
+(target is a raw address) — or raises `AmbiguousRecipient`, which carries a
+pick-list the MCP layer prints instead of sending.
+
+**Contacts is the source of truth for names**, not chat history. Names used to be
+substring-matched against recent chats, which is how a personal name once resolved
+to a nine-person group that merely contained that person. `contacts_mac.py` reads the Contacts
+SQLite stores directly (read-only, `?immutable=1`):
+
+```
+~/Library/Application Support/AddressBook/AddressBook-v22.abcddb
+~/Library/Application Support/AddressBook/Sources/<uuid>/AddressBook-v22.abcddb
+```
+
+One store per account, so the same person appears more than once with different
+labels on the same number; records merge by normalized name, numbers dedupe by
+digits, and the better label wins. This beats BlueBubbles' `/api/v1/contact`,
+which exposes one source (232 of 335 contacts here) and returns **no labels**.
+
+### Resolution order
+
+1. Phone/email input → existing 1:1 chat with that address, else `new`.
+2. **Strong** contact match (exact full, first, or last name) → that person.
+3. Group chat by its own `displayName` — exact always; partial only when
+   Contacts had no opinion. The synthesized "Alice, Bob, Carol" participant
+   label is **never** matched, which is what keeps a personal name off a group.
+4. **Weak-but-specific** contact match (every query word present, e.g.
+   "Sam Okafor" inside "Robin & Sam Okafor") → that person.
+5. BlueBubbles contacts, exact name only — the degraded path when Contacts is
+   unreadable (no Full Disk Access).
+6. Otherwise `ValueError`.
+
+Anything genuinely ambiguous raises rather than guesses: several contacts at the
+same match strength, a lone substring hit, or a contact whose best number isn't a
+handset. **Nothing is sent on an ambiguous match.**
+
+### Number preference and the couple convention
+
+Label rank: `iphone` → `mobile` → `pager` → `main` → `home` → `work` → `other`.
+A contact with one number uses it whatever the label.
+
+In this address book a couple filed as one contact ("Alex and Dana Rivera")
+keeps **the man's number under Mobile and the woman's under Pager**. Position is
+not the signal — "Robin & Sam Okafor" and "Jo & Chris Vance" both list the woman
+first — so the rule needs the first name's gender, read from
+`contacts.couple_gender` in **config.json** (kept there, not in source, because
+it is a list of real people and config.json is gitignored). Names absent from
+that table produce a pick-list rather than a guess; add to it freely. The convention only applies when the
+contact carries **both** a mobile and a pager.
+
+So "text Dana" → Dana's pager number, `Dana Rivera`; "text Alex Rivera" → the
+mobile; "text Alex And Dana Rivera" → asks which.
+
+### Gotchas
+
+- `query_chats` defaults to `CHAT_QUERY_LIMIT = 1000`. It was 100, and a 1:1
+  thread quiet for months sorted past it — resolution then fell through to
+  `chat/new`, which needs the Private API and fails silently under
+  `method: apple-script`.
+- Reading Contacts needs Full Disk Access for whatever process runs the MCP
+  server. `contacts_mac.available()` reports this; resolution degrades to step 5
+  rather than raising.
+- `python3 src/contacts_mac.py "Some Name"` prints what a name resolves to.
 
 ## Web Chat (`web/chat.php` + `src/agent/`)
 
