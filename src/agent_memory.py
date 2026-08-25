@@ -2,11 +2,15 @@
 import hashlib
 import json
 import os
+import sys
 from datetime import datetime, timedelta
 
 import requests
 
-STATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'agent_state.json')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import data_path  # noqa: E402
+
+STATE_PATH = data_path('agent_state.json')
 
 
 class AgentMemory:

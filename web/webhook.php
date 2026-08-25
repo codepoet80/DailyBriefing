@@ -28,6 +28,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 $BASE = dirname(__FILE__) . '/..';
+require_once dirname(__FILE__) . '/paths.php';
 require_once dirname(__FILE__) . '/agent_client.php';
 
 $DEFAULT_CLIENT_CONTEXT =
@@ -66,7 +67,7 @@ function wh_text_key($text)
 
 function wh_log($base, $line)
 {
-    $path = $base . '/data/webhook.log';
+    $path = db_data_path('webhook.log');
     @file_put_contents(
         $path,
         date('Y-m-d H:i:s') . ' ' . $line . "\n",
@@ -170,7 +171,7 @@ $client = $client !== '' ? $client : 'unknown';
 $has_audio = !empty($_FILES['audio']['tmp_name']) && is_uploaded_file($_FILES['audio']['tmp_name']);
 
 if (!empty($wh['save_audio']) && $has_audio) {
-    $audio_dir = $BASE . '/data/webhook_audio';
+    $audio_dir = db_data_path('webhook_audio');
     if (!is_dir($audio_dir)) { @mkdir($audio_dir, 0755, true); }
     $stamp = preg_replace('/[^0-9]/', '', $recorded_at);
     if ($stamp === '') { $stamp = (string)time(); }
@@ -191,8 +192,8 @@ if (strlen($transcription) > 4000) {
 // The ring's retry behaviour is undocumented; a retry after a slow turn must
 // not run the agent (and its tools) a second time.
 $dedupe_seconds = isset($wh['dedupe_seconds']) ? (int)$wh['dedupe_seconds'] : 600;
-$state_path = $BASE . '/data/webhook_state.json';
-$lock_path = $BASE . '/data/.webhook.lock';
+$state_path = db_data_path('webhook_state.json');
+$lock_path = db_data_path('.webhook.lock');
 $lock = @fopen($lock_path, 'c');
 if ($lock) {
     flock($lock, LOCK_EX);

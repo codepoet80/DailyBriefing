@@ -1,5 +1,51 @@
 # Daily Briefing
 
+## Never delete anything under `data/`
+
+**`data/` is live user data. Do not delete, truncate, or overwrite any file in
+it — ever, for any reason, including cleaning up after your own tests.** It holds
+chat sessions, health logs, dialectics, scheduled messages, and the briefing
+itself. None of it is in git, none of it is backed up, and there is no undo.
+
+This is written down because it has already gone wrong twice in one session.
+Both times the reasoning was "these are just my test artifacts":
+
+1. `rm -f data/chat_sessions/*.json` — a glob that cannot tell a test fixture
+   from a live session.
+2. `rm -f data/chat_sessions/index01-ring.json` — by exact name, which felt
+   safer and wasn't. That file had stopped being a test artifact the moment ring
+   turns began rendering on the briefing page; it was the live ring
+   conversation.
+
+The lesson from the second one is the important one: **a file you created during
+testing does not stay yours.** Ownership isn't decided by who wrote it first.
+
+Leaving test data in place is harmless — sessions expire on their own via
+`chat_agent.session_ttl_hours`, and a stray row in a log bothers nobody. There is
+no cleanup obligation to weigh against the risk.
+
+### Testing without touching real data
+
+`DB_DATA_DIR` relocates the entire data directory. Set it and the whole app —
+briefing build, MCP server, chat handler, web chat, webhook — reads and writes
+there instead:
+
+```bash
+export DB_DATA_DIR=/tmp/db-test-data
+mkdir -p "$DB_DATA_DIR"
+cp data/briefing.json "$DB_DATA_DIR/"      # if the test needs briefing content
+DB_DATA_DIR="$DB_DATA_DIR" php -S 127.0.0.1:8199 -t web/
+```
+
+Then throw the directory away — there is no cleanup step in the real `data/` to
+get wrong. Resolvers are `src/paths.py` (`data_dir()` / `data_path()`) and
+`web/paths.php` (`db_data_dir()` / `db_data_path()`); **both** must honour it,
+and `db_run_agent()` passes it down to the Python handler it spawns, because a
+half-applied override is worse than none — it looks isolated when it isn't.
+
+Verify isolation by fingerprinting `data/` before and after:
+`find data -type f | sort | xargs shasum | shasum`.
+
 A self-hosted morning dashboard that aggregates calendars, news, todos, Geek News (HN + Slashdot), XKCD, and more into a single read-only web page. Built to run on macOS or Raspberry Pi, with a PHP frontend compatible with a 2011 webOS TouchPad.
 
 ## Architecture

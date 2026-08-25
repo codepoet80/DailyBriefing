@@ -37,7 +37,9 @@ BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bluebubbles as bb  # noqa: E402
 
-SCHED_DIR = os.path.join(BASE_DIR, 'data', 'scheduled_messages')
+from paths import data_path
+
+SCHED_DIR = data_path('scheduled_messages')
 FAILED_DIR = os.path.join(SCHED_DIR, 'failed')
 EXPIRED_DIR = os.path.join(SCHED_DIR, 'expired')
 LOCK_PATH = os.path.join(SCHED_DIR, '.sweep.lock')

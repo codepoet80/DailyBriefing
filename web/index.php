@@ -1,5 +1,6 @@
 <?php
-$briefing_path = dirname(__FILE__) . '/../data/briefing.json';
+require_once dirname(__FILE__) . '/paths.php';
+$briefing_path = db_data_path('briefing.json');
 
 if (!file_exists($briefing_path)) {
     echo '<html><body style="font-family:sans-serif;padding:20px">';
@@ -595,7 +596,7 @@ function chat_session_turns($sid, $source)
     if (!$sid || !preg_match('/^[A-Za-z0-9_-]{8,64}$/', $sid)) {
         return array();
     }
-    $path = dirname(__FILE__) . '/../data/chat_sessions/' . $sid . '.json';
+    $path = db_data_path('chat_sessions/' . $sid . '.json');
     if (!file_exists($path)) {
         return array();
     }

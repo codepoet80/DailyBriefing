@@ -13,7 +13,9 @@ from agent_memory import AgentMemory
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 CONFIG_DIR = os.path.join(BASE_DIR, 'config')
-DATA_DIR = os.path.join(BASE_DIR, 'data')
+from paths import data_dir
+
+DATA_DIR = data_dir()
 
 
 def load_config():

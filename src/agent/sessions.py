@@ -1,19 +1,27 @@
 """Per-device chat session store.
 
-Each chat client (browser cookie) gets a JSON file under data/chat_sessions/.
+Each chat client (browser cookie) gets a JSON file under <data>/chat_sessions/,
+where <data> is DB_DATA_DIR or the repo's data/ (see src/paths.py).
 Sessions hold a rolling window of turns plus the active dialectic id (if any).
 """
 import json
 import os
 import re
 import secrets
+import sys
 import time
 from datetime import datetime
 
-SESSION_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    'data', 'chat_sessions',
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
+from paths import data_path  # noqa: E402
+
+
+def _session_dir():
+    # Resolved per call, not at import, so DB_DATA_DIR set by a caller after
+    # import still takes effect.
+    return data_path('chat_sessions')
 
 _SAFE_ID = re.compile(r'^[A-Za-z0-9_-]{8,64}$')
 
@@ -23,11 +31,11 @@ def _now():
 
 
 def _path(session_id):
-    return os.path.join(SESSION_DIR, f'{session_id}.json')
+    return os.path.join(_session_dir(), f'{session_id}.json')
 
 
 def ensure_dir():
-    os.makedirs(SESSION_DIR, exist_ok=True)
+    os.makedirs(_session_dir(), exist_ok=True)
 
 
 def new_session_id():
@@ -80,14 +88,14 @@ def trim(state, max_turns):
 
 def prune(ttl_hours):
     """Delete session files idle for longer than ttl_hours."""
-    if not os.path.isdir(SESSION_DIR):
+    if not os.path.isdir(_session_dir()):
         return 0
     cutoff = time.time() - (ttl_hours * 3600)
     removed = 0
-    for name in os.listdir(SESSION_DIR):
+    for name in os.listdir(_session_dir()):
         if not name.endswith('.json'):
             continue
-        p = os.path.join(SESSION_DIR, name)
+        p = os.path.join(_session_dir(), name)
         try:
             if os.path.getmtime(p) < cutoff:
                 os.remove(p)

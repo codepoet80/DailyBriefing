@@ -21,8 +21,29 @@ function db_run_agent($base, array $payload)
         1 => array('pipe', 'w'),
         2 => array('pipe', 'w'),
     );
+    // Pass DB_DATA_DIR down to the handler. Without this the PHP side could be
+    // pointed at a temp directory while the Python side still wrote to the real
+    // one — a half-applied override is worse than none, because it looks like
+    // the test is isolated when it isn't.
+    $env = null;
+    $data_dir = getenv('DB_DATA_DIR');
+    if ($data_dir === false || trim($data_dir) === '') {
+        $data_dir = isset($_SERVER['DB_DATA_DIR']) ? $_SERVER['DB_DATA_DIR'] : '';
+    }
+    if (trim((string)$data_dir) !== '') {
+        $env = array();
+        foreach ($_SERVER as $k => $v) {
+            if (is_string($v) && preg_match('/^[A-Z_][A-Z0-9_]*$/', $k)) { $env[$k] = $v; }
+        }
+        foreach (array('PATH', 'HOME', 'LANG', 'USER') as $k) {
+            $val = getenv($k);
+            if ($val !== false && !isset($env[$k])) { $env[$k] = $val; }
+        }
+        $env['DB_DATA_DIR'] = trim((string)$data_dir);
+    }
+
     $cmd = escapeshellarg($python) . ' ' . escapeshellarg($script);
-    $proc = proc_open($cmd, $descriptors, $pipes, $base, null);
+    $proc = proc_open($cmd, $descriptors, $pipes, $base, $env);
     if (!is_resource($proc)) {
         return array('ok' => false, 'error' => 'failed to spawn agent', 'http' => 500);
     }

@@ -21,7 +21,9 @@ import os
 from datetime import date, datetime, timedelta
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-HEALTH_DIR = os.path.join(BASE_DIR, 'data', 'health')
+from paths import data_path
+
+HEALTH_DIR = data_path('health')
 
 
 def _read_jsonl(path):

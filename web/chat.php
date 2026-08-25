@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $BASE = dirname(__FILE__) . '/..';
+require_once dirname(__FILE__) . '/paths.php';
 require_once dirname(__FILE__) . '/agent_client.php';
 
 $config_path = $BASE . '/config/config.json';

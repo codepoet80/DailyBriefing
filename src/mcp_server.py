@@ -12,7 +12,10 @@ from mcp.server.stdio import stdio_server
 from mcp import types
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-DATA_DIR = os.path.join(BASE_DIR, 'data')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from paths import data_dir  # noqa: E402
+
+DATA_DIR = data_dir()
 # Keep in step with scheduled_send.SWEEP_INTERVAL / the launchd StartInterval.
 # Delays below this get a precise one-shot timer as well as the sweep.
 SWEEP_INTERVAL_MINUTES = 10

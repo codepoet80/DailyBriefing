@@ -31,7 +31,9 @@ from agent import sessions
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 CONFIG_PATH = os.path.join(BASE_DIR, 'config', 'config.json')
-BRIEFING_PATH = os.path.join(BASE_DIR, 'data', 'briefing.json')
+from paths import data_path  # noqa: E402
+
+BRIEFING_PATH = data_path('briefing.json')
 MCP_SERVER_PATH = os.path.join(BASE_DIR, 'src', 'mcp_server.py')
 
 DEFAULT_MODEL = 'claude-sonnet-4-6'
