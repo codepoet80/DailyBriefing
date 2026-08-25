@@ -5,8 +5,9 @@ Reads a JSON payload from stdin:
     {
       "session_id": "...",       # optional; new session created if missing/invalid
       "user_message": "...",
-      "shared_secret": "..."     # if chat_agent.shared_secret is set
-    }
+      "shared_secret": "...",    # if chat_agent.shared_secret is set
+      "client_context": "..."    # optional; prepended to the volatile system block
+    }                            #   (web/webhook.php uses it to say "this is the ring")
 
 Runs the Anthropic tool-use loop against the live MCP server and writes a
 JSON result to stdout:
@@ -207,9 +208,11 @@ def _build_stable_system_text(config):
     return '\n\n'.join(sections)
 
 
-def _build_volatile_system_text(briefing, active_dialectic_id):
+def _build_volatile_system_text(briefing, active_dialectic_id, client_context=''):
     """The per-request half: briefing data and active dialectic state. Not cached."""
     sections = []
+    if client_context:
+        sections.append(client_context)
     if active_dialectic_id:
         sections.append(
             f'Active dialectic id for this session: {active_dialectic_id}. '
@@ -225,7 +228,7 @@ def _build_volatile_system_text(briefing, active_dialectic_id):
     return '\n\n'.join(sections)
 
 
-def _build_system_blocks(config, briefing, active_dialectic_id=None):
+def _build_system_blocks(config, briefing, active_dialectic_id=None, client_context=''):
     """Two-block system prompt: stable text (cached) then volatile text (uncached)."""
     return [
         {
@@ -235,7 +238,9 @@ def _build_system_blocks(config, briefing, active_dialectic_id=None):
         },
         {
             'type': 'text',
-            'text': _build_volatile_system_text(briefing, active_dialectic_id),
+            'text': _build_volatile_system_text(
+                briefing, active_dialectic_id, client_context
+            ),
         },
     ]
 
@@ -284,7 +289,7 @@ def _track_active_dialectic(state, tool_name, tool_input, result_text):
             state['active_dialectic_id'] = None
 
 
-async def _run_turn(config, state, user_message):
+async def _run_turn(config, state, user_message, client_context=''):
     import anthropic
 
     chat_cfg = config.get('chat_agent', {})
@@ -300,7 +305,9 @@ async def _run_turn(config, state, user_message):
 
     briefing = _load_briefing()
     system_blocks = _build_system_blocks(
-        config, briefing, active_dialectic_id=state.get('active_dialectic_id')
+        config, briefing,
+        active_dialectic_id=state.get('active_dialectic_id'),
+        client_context=client_context,
     )
 
     sessions.append_turn(state, 'user', user_message)
@@ -408,11 +415,17 @@ async def main():
     session_id = payload.get('session_id') or ''
     state = sessions.load(session_id) if session_id else None
     if state is None:
-        session_id = sessions.new_session_id()
+        # Keep a well-formed caller-supplied id even with no file behind it yet,
+        # so a fixed id (web/webhook.php pins one per device) can bootstrap and
+        # a browser whose session was pruned keeps its cookie.
+        if not sessions.is_valid_id(session_id):
+            session_id = sessions.new_session_id()
         state = sessions.new_state()
 
+    client_context = (payload.get('client_context') or '').strip()[:2000]
+
     try:
-        result = await _run_turn(config, state, user_message)
+        result = await _run_turn(config, state, user_message, client_context)
     except Exception as e:
         _fail(f'agent error: {type(e).__name__}: {e}', session_id=session_id)
         return

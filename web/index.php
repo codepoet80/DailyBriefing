@@ -586,6 +586,39 @@ function trend_arrow($trend) {
 <?php endif; ?>
 
 <?php
+/**
+ * Read one chat session file and return its renderable turns, tagged with
+ * where they came from ('' = this browser, 'ring' = the Index.01 webhook).
+ */
+function chat_session_turns($sid, $source)
+{
+    if (!$sid || !preg_match('/^[A-Za-z0-9_-]{8,64}$/', $sid)) {
+        return array();
+    }
+    $path = dirname(__FILE__) . '/../data/chat_sessions/' . $sid . '.json';
+    if (!file_exists($path)) {
+        return array();
+    }
+    $sess = json_decode(file_get_contents($path), true);
+    if (!is_array($sess) || empty($sess['turns'])) {
+        return array();
+    }
+    $out = array();
+    foreach ($sess['turns'] as $turn) {
+        $role = isset($turn['role']) ? $turn['role'] : '';
+        if ($role !== 'user' && $role !== 'assistant') continue;
+        $text = isset($turn['content']) ? $turn['content'] : '';
+        if ($text === '') continue;
+        $out[] = array(
+            'role'    => $role,
+            'content' => $text,
+            'at'      => isset($turn['at']) ? (string)$turn['at'] : '',
+            'source'  => $source,
+        );
+    }
+    return $out;
+}
+
 $chat_cfg     = isset($briefing['chat_agent_ui']) ? $briefing['chat_agent_ui'] : array();
 $chat_enabled = false;
 $chat_needs_secret = false;
@@ -602,26 +635,43 @@ if (file_exists($_cfg_path)) {
 <div class="section section-chat" id="chat">
     <h2>Chat</h2>
     <div id="chat-log" class="chat-log" aria-live="polite"><?php
-        $sid = isset($_COOKIE['db_chat_sid']) ? $_COOKIE['db_chat_sid'] : '';
-        if ($sid && preg_match('/^[A-Za-z0-9_-]{8,64}$/', $sid)) {
-            $sess_path = dirname(__FILE__) . '/../data/chat_sessions/' . $sid . '.json';
-            if (file_exists($sess_path)) {
-                $sess = json_decode(file_get_contents($sess_path), true);
-                if (is_array($sess) && !empty($sess['turns'])) {
-                    foreach (array_slice($sess['turns'], -4) as $turn) {
-                        $r = isset($turn['role']) ? $turn['role'] : '';
-                        if ($r !== 'user' && $r !== 'assistant') continue;
-                        $text = isset($turn['content']) ? $turn['content'] : '';
-                        if ($text === '') continue;
-                        $label = $r === 'user' ? 'You' : 'Agent';
-                        $cls   = $r === 'user' ? 'chat-turn-user' : 'chat-turn-agent';
-                        echo '<div class="chat-turn ' . $cls . '">';
-                        echo '<span class="chat-role">' . h($label) . ':</span> ';
-                        echo nl2br(h($text));
-                        echo '</div>';
-                    }
-                }
+        // This browser's own session, plus the ring's fixed session, merged by
+        // timestamp — so anything said to the Index.01 shows up here too.
+        $turns = chat_session_turns(
+            isset($_COOKIE['db_chat_sid']) ? $_COOKIE['db_chat_sid'] : '', ''
+        );
+        if (!empty($_cfg['webhook']['enabled'])) {
+            $ring_sid = !empty($_cfg['webhook']['session_id'])
+                ? $_cfg['webhook']['session_id'] : 'index01-ring';
+            if ($ring_sid !== (isset($_COOKIE['db_chat_sid']) ? $_COOKIE['db_chat_sid'] : '')) {
+                $turns = array_merge($turns, chat_session_turns($ring_sid, 'ring'));
             }
+        }
+
+        // usort is not stable before PHP 8, and a ring turn and a web turn can
+        // land in the same second — decorate with position to keep it settled.
+        $_i = 0;
+        foreach ($turns as $_k => $_v) { $turns[$_k]['seq'] = $_i++; }
+        usort($turns, function ($a, $b) {
+            $c = strcmp($a['at'], $b['at']);
+            return $c !== 0 ? $c : ($a['seq'] - $b['seq']);
+        });
+
+        $history_turns = 6;
+        if (isset($_cfg['chat_agent']['history_turns'])) {
+            $history_turns = (int)$_cfg['chat_agent']['history_turns'];
+        }
+        foreach (array_slice($turns, -$history_turns) as $turn) {
+            $label = $turn['role'] === 'user' ? 'You' : 'Agent';
+            $cls   = $turn['role'] === 'user' ? 'chat-turn-user' : 'chat-turn-agent';
+            if ($turn['source'] === 'ring') { $cls .= ' chat-turn-ring'; }
+            echo '<div class="chat-turn ' . $cls . '">';
+            echo '<span class="chat-role">' . h($label) . ':</span> ';
+            if ($turn['source'] === 'ring') {
+                echo '<span class="chat-via">[via ring]</span> ';
+            }
+            echo nl2br(h($turn['content']));
+            echo '</div>';
         }
     ?></div>
     <form id="chat-form" class="chat-form" onsubmit="return chatSubmit(event);">

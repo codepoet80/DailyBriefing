@@ -4,6 +4,10 @@
 config/config.json
 config/agent_rules.json
 
+# Deployment configs — contain real hostnames, LAN/Tailscale addresses and
+# network topology. Private, never published.
+config/nginx/
+
 # Generated data and logs
 data/briefing.json
 data/xkcd_state.json

@@ -77,6 +77,8 @@ web/
   index.php            # PHP renderer, PHP 7.4 compatible. Pre-renders trailing chat turns from cookie.
   style.css            # Old WebKit compatible (no Grid, no CSS vars)
   chat.php             # POST endpoint: shells out to src/agent/chat_handler.py, sets session cookie
+  webhook.php          # Token-auth webhook for the Index.01 ring — same agent, reply via Pushover
+  agent_client.php     # Shared db_run_agent() / db_pushover() helpers used by chat.php + webhook.php
   chat.js              # ES5 + XHR chat client. Manages local secret, spinner, status line.
   spinner.gif          # 24x24 8-frame animated GIF (ImageMagick-generated) for thinking state
   manifest.json        # PWA manifest for Android installability
@@ -149,7 +151,8 @@ requirements.txt       # requests, icalendar, recurring_ical_events, feedparser,
     "night_end_minute": 30
   },
   "todos": {
-    "command": "checkmate ls", // any CLI that outputs "○ N. Title" lines
+    "command": "checkmate ls",      // any CLI that outputs "○ N. Title" lines
+    "add_command": "checkmate add", // used by the add_todo MCP tool
     "count": 8
   },
   "calendar_filters": {
@@ -250,6 +253,29 @@ Rendered as a slim green/amber banner right below the remote Server Status banne
 (reuses the `.section-servers` styles). The `local_services` agent rule pushes a
 priority-1 alert when any service is down.
 
+## Todos (`fetch_todos.py`)
+
+Reads whatever `todos.command` prints, keeping lines matching `○/● N. Title`
+(the format of [checkmate-cli](https://github.com/codepoet80/checkmate-cli),
+which is itself a client for a remote checkmate-service and needs its own
+`~/.checkmate.conf`). `todos.add_command` is the write side, used by the
+`add_todo` MCP tool.
+
+Both go through `resolve_command()`, so either key may be given as
+`${HOME}/path/checkmate.py ls`, `~/path/checkmate.py ls`, an absolute path, or a
+bare name found on `PATH`. **Expand-then-`which` is the point:** the config
+string used to be handed to `str.split()` verbatim, so the `${HOME}` form shipped
+in `config.json.example` looked for a directory literally named `${HOME}` and
+silently produced an empty todo list on every hourly run. Splitting is `shlex`,
+not `str.split`, so a path containing spaces survives.
+
+A missing or failing command is *not* silent on the write side: `add_todo` raises
+(so MCP marks the result `isError` and the chat/webhook show ✗). It used to
+return `Error: ...` as ordinary text, which surfaced as a **successful** tool call
+and let the agent claim it had added a todo that was never written. The read side
+still degrades quietly to `[]` — a broken todo binary shouldn't take down the
+whole briefing build — but logs which path it tried.
+
 ## Weather (`fetch_weather.py`)
 
 Uses [Open-Meteo](https://open-meteo.com/) — no API key required. Returns current conditions plus a 5-day forecast. WMO weather code table maps numeric codes to human-readable strings. Displayed collapsed by default showing temp + condition summary.
@@ -331,7 +357,7 @@ so the briefing build continues and the Reading section simply drops out.
 10. **Family This Week** — 7-day family calendars, grouped by day with "today" badge, color-coded per person
 11. **Tomorrow** — my calendars only, afternoon run only
 12. **XKCD** — only shown when a new comic is detected
-13. **Chat** — only when `chat_agent.enabled`. Last 4 turns pre-rendered server-side from the `db_chat_sid` cookie; new turns appended client-side.
+13. **Chat** — only when `chat_agent.enabled`. Last `chat_agent.history_turns` (6) turns pre-rendered server-side, merging the `db_chat_sid` cookie session with the Index.01 ring's session (marked "via ring"); new turns appended client-side.
 
 ## Geek News (`fetch_geek_news.py`)
 
@@ -543,6 +569,207 @@ Key files:
 Session continuity: every reply rotates the cookie's session forward; on page reload, `index.php` reads the cookie, loads the session JSON, and renders the last 4 turns into `#chat-log` so the chat doesn't feel "empty" each load. Independent of dialectic persistence.
 
 Tool allowlist: `config.chat_agent.allowed_tools` is the source of truth for what the web chat can call. Adding a tool to `mcp_server.py` does NOT automatically expose it to the web chat — the name must also be added to this list. Desktop sessions get the full surface regardless.
+
+## Index.01 Webhook (`web/webhook.php`)
+
+Voice access to the same agent from a [Index.01 ring](https://help.repebble.com/en/articles/15724406-index-advanced-features-mcp-webhook).
+The ring records, transcribes on-device, and POSTs to a configured URL; this
+endpoint feeds that transcription to `chat_handler.py` — the identical agent,
+prompt, and MCP tool surface the chat box uses — and pushes the reply back.
+
+```
+Ring → HTTPS POST /webhook.php (multipart/form-data, Authorization header)
+webhook.php → db_run_agent() → chat_handler.py → mcp_server.py → reply
+webhook.php → Pushover push to Jon's phone  +  JSON body with the same text
+```
+
+### What the ring sends
+
+`POST` `multipart/form-data`, plus any custom headers configured in the app:
+
+| Field | Notes |
+|---|---|
+| `transcription` | plain text; present when *text transmission* is enabled |
+| `audio` | `audio/mp4` (M4A); present when *audio transmission* is enabled |
+| `recordedAt` | ms since epoch; always sent |
+| `client` | always `ring` |
+
+Set the app's **Send** option to transcription (or both). **Audio-only is
+rejected with a 400** — there is no speech-to-text on this end, and silently
+accepting it would look like the ring was being ignored.
+
+### Setup
+
+1. `config.webhook.token` — a long random string. The endpoint **refuses to run
+   with an empty token** (unlike the chat box, whose reachability is the page's
+   own; this URL is meant to face the internet).
+2. In the Index app: URL `https://your-host/webhook.php`, custom header
+   `Authorization: Bearer <that token>`, Send = transcription, pick a trigger.
+   `Bearer <t>`, `Token <t>`, a bare token, and `X-Webhook-Token` are all accepted.
+3. The ring requires **HTTPS**, so the endpoint needs a real certificate — a LAN
+   self-signed cert will not do. The briefing itself stays on the LAN; only the
+   webhook is published, via reverse proxy (below).
+
+### Publishing it
+
+The briefing runs on the home box's own nginx and is not meant to face the
+internet. The webhook alone is published by reverse-proxying **one exact path**
+from a public server to the briefing host **over Tailscale** — both are already
+on the tailnet, so there is no port-forward and no inbound hole in the home
+firewall.
+
+The live nginx for this lives in `config/nginx/`, which is **gitignored**: it
+carries real hostnames, Tailscale addresses, and the topology of which box
+fronts which. Keep it that way — don't paste those values into this file, the
+README, or commit messages.
+
+Two things that bite here:
+
+**`location ~ \.php$` outranks `location /`.** The `$is_internal` guard lives in
+`location /`, but nginx matches regex locations first, so it never applied to
+any PHP file — `/chat.php` answered anything that could reach the briefing port,
+and `chat_agent.shared_secret` is `""`. The guard has to be repeated inside the
+regex block. Check with `curl -so /dev/null -w '%{http_code}\n'
+http://<briefing-host>:<port>/chat.php` from a tailnet address: `301` good,
+`405` still open. (Tailscale's `100.64.0.0/10` is *not* in the `geo $is_internal`
+block, which lists only RFC1918 + loopback, so tailnet peers correctly read as
+external.)
+
+**Use `location =`, never a prefix,** for the proxied path: under a prefix match
+`/<path>/../chat.php` reaches the unauthenticated chat agent. Allow-list the
+proxy's tailnet address on the home side as defence in depth.
+
+**60-second timeouts on both hops.** `webhook.php` and `chat.php` both set
+`set_time_limit(300)`, but nginx defaults `fastcgi_read_timeout` and
+`proxy_read_timeout` to 60s. A long tool loop 504s at the proxy while the agent
+keeps running and still fires its Pushover reply — confusing to debug. Set 300s
+at both the public proxy and the home fastcgi block.
+
+Test without the ring:
+```bash
+curl -X POST https://your-host/webhook.php \
+  -H 'Authorization: Bearer <token>' \
+  -F 'transcription=what is on my calendar today' \
+  -F "recordedAt=$(date +%s)000" -F 'client=ring'
+```
+A JSON body (`{"transcription": "..."}`) is accepted too, for testing only.
+
+### Reply delivery
+
+The ring has no screen and the vendor docs **do not specify** whether the HTTP
+response is surfaced anywhere, so the reply is delivered two ways: pushed to the
+phone via Pushover (reusing `config.agent.pushover_*`) **and** returned in the
+response body as both `reply` and `text`. Turn the push off with
+`reply_via_pushover: false` if the device ever starts reading responses.
+
+Because of that same unknown, the endpoint sets `ignore_user_abort(true)`: if the
+ring gives up waiting, the turn still finishes and the push still lands. Typical
+round trip is 3–6s.
+
+### Config (`config.json` → `webhook`)
+
+```json
+{
+  "enabled": true,
+  "token": "long-random-string",   // required; no token = 500, never wide open
+  "session_id": "index01-ring",    // fixed id → follow-ups work across taps
+  "reply_via_pushover": true,
+  "pushover_title": "Index",
+  "pushover_priority": 0,
+  "max_reply_chars": 900,          // Pushover truncates past ~1024
+  "dedupe_seconds": 600,
+  "save_audio": false,             // write M4As to data/webhook_audio/ for debugging
+  "system_prompt_extra": ""        // appended to the ring's client context
+}
+```
+
+### Capture-on-doubt
+
+The ring's context tells the agent that when a transcription is **too garbled or
+ambiguous to act on confidently**, it must not guess and must not just ask a
+question back: it calls `add_todo` with its best literal reading and appends
+` [via ring]` to the title, then says so in one line. Jon is talking to a
+screen-less device and may not read the push for hours, so a capture he can
+correct later beats a wrong action or a question left hanging.
+
+The rule is deliberately fenced on both sides — noise the agent can confidently
+read through is *not* doubt, and neither is a question answerable from the
+briefing data. Without that fence it turns every loosely-phrased request into a
+todo instead of doing the thing. Verified: "tell marsh about the thing on choose
+day before it gets too" → todo *"Tell Marsh about the thing on Tuesday before it
+gets too [via ring]"* (recovers `choose day`, preserves the unresolvable tail),
+while "what is the temperature" still just answers.
+
+`add_todo` must stay in `chat_agent.allowed_tools` for this to work — the webhook
+shares that allowlist.
+
+### Voice-shaped replies
+
+`chat_handler.py` takes an optional `client_context` in its stdin payload,
+prepended to the **volatile** system block (not the cached stable one, so it
+can't bust the prompt cache for the chat box). `webhook.php` uses it to tell the
+agent the input is a transcription — read for intent, expect mangled proper
+nouns — and that the answer lands as a push notification, so: two or three short
+sentences, no markdown, no lists. Extend it via `webhook.system_prompt_extra`.
+
+### Ring turns in the page's chat log
+
+`index.php` renders the trailing turns of **both** the browser's own cookie
+session and the ring's fixed session, merged by each turn's `at` timestamp, so
+anything said to the Index.01 shows up in the Chat section on the next page load.
+Ring turns carry a `chat-turn-ring` class and a small "via ring" marker.
+`chat_session_turns()` loads and tags one session file; the merge and slice
+happen at the render site. Count is `chat_agent.history_turns` (default 6, up
+from the old hard-coded 4 — two sources need more room).
+
+`usort` is not stable before PHP 8 and a ring turn can share a wall-clock second
+with a web turn, so turns are decorated with their position and that breaks ties.
+Ring turns are skipped entirely when `webhook.enabled` is false.
+
+This is a **display** merge only: the two sessions stay separate as far as the
+agent is concerned, so a ring conversation and a browser conversation don't
+share context or compete for the same rolling turn window. Pointing both at one
+session id would give cross-device continuity ("add milk" on the ring, then
+"make that oat milk" in the browser) at the cost of every browser sharing one
+conversation.
+
+### Session continuity and replay
+
+The ring has no cookie, so it pins one **fixed** `session_id`. Consecutive taps
+therefore continue one conversation ("what time is it" → "and in UTC?"), and
+`run.sh`'s session prune clears it on the normal `chat_agent.session_ttl_hours`
+schedule.
+
+This required a fix in `chat_handler.py`: it used to mint a **new random id**
+whenever `sessions.load()` came back `None`, so a caller-supplied fixed id could
+never bootstrap — the first request silently landed in a random session and every
+"follow-up" started over. A well-formed supplied id is now kept even with no file
+behind it yet. (Same benefit for a browser whose session file was pruned: it
+keeps its cookie instead of being reassigned.)
+
+Retry behaviour is also undocumented, and a retried turn would re-run the agent's
+*tools* — sending a message or logging a workout twice. `data/webhook_state.json`
+remembers the last handled request and **two** things disqualify a repeat within
+`dedupe_seconds`; either one replays the cached reply, returns `duplicate: true`,
+and never reaches the agent (so no second Pushover either):
+
+| matched on | catches |
+|---|---|
+| `recordedAt` | the same recording re-delivered — a retry of one press |
+| normalised transcription text | the same words said twice in a row — a double press, or the ring re-sending under a fresh `recordedAt` |
+
+`wh_text_key()` lowercases, strips punctuation, and collapses whitespace before
+hashing, because speech-to-text is not byte-stable across takes — "What time is
+it -- just the time!" must match "what time is it, just the time".
+
+Text matching is against the **immediately previous** request only, not a
+history. Asking the same thing again later in the window still runs: repeating
+yourself an hour apart is a real question, repeating within one press is not.
+
+A `flock` on `data/.webhook.lock` serializes turns, so a retry that arrives
+mid-flight waits and then hits that cache rather than racing.
+
+Every request logs a request/response line to `data/webhook.log`.
 
 ## Health Tracking
 

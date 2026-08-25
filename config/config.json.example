@@ -106,8 +106,8 @@
     "night_end_minute": 30
   },
   "todos": {
-    "command": "${HOME}/Projects/library/macos/checkmate.py ls",
-    "add_command": "${HOME}/Projects/library/macos/checkmate.py add",
+    "command": "${HOME}/Projects/checkmate-cli/checkmate.py ls",
+    "add_command": "${HOME}/Projects/checkmate-cli/checkmate.py add",
     "count": 8
   },
   "reading": {
@@ -185,6 +185,19 @@
       "log_joy",
       "get_health_summary"
     ],
+    "system_prompt_extra": ""
+  },
+  "webhook": {
+    "enabled": true,
+    "token": "generate-a-long-random-string",
+    "session_id": "index01-ring",
+    "reply_via_pushover": true,
+    "pushover_title": "Index",
+    "pushover_priority": 0,
+    "pushover_sound": "",
+    "max_reply_chars": 900,
+    "dedupe_seconds": 600,
+    "save_audio": false,
     "system_prompt_extra": ""
   },
   "contacts": {

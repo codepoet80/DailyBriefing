@@ -4,7 +4,6 @@ so Claude Code (local or via remote tunnel) has your full daily context."""
 import asyncio
 import json
 import os
-import shlex
 import subprocess
 import sys
 
@@ -606,23 +605,31 @@ async def call_tool(name: str, arguments: dict):
     if name == 'add_todo':
         title = arguments.get('title', '').strip()
         if not title:
-            return [types.TextContent(type='text', text='Error: title is required')]
-        import shutil
+            raise ValueError('title is required')
+        from fetch_todos import resolve_command  # type: ignore
         add_cmd = config.get('todos', {}).get('add_command', 'checkmate add')
-        cmd_parts = shlex.split(add_cmd)
-        resolved = shutil.which(cmd_parts[0])
-        if resolved:
-            cmd_parts[0] = resolved
+        cmd_parts = resolve_command(add_cmd)
+        if not cmd_parts:
+            raise ValueError('todos.add_command is not configured')
+        # Errors raise so the MCP layer marks the result isError — returning them
+        # as ordinary text made a failed add report as a success in the chat UI.
         try:
             result = subprocess.run(
                 cmd_parts + ['--', title],
                 capture_output=True, text=True, timeout=10,
             )
-            if result.returncode == 0:
-                return [types.TextContent(type='text', text=f'Added todo: {title}')]
-            return [types.TextContent(type='text', text=f'Error: {result.stderr.strip()}')]
-        except Exception as e:
-            return [types.TextContent(type='text', text=f'Error: {e}')]
+        except FileNotFoundError:
+            raise ValueError(
+                f'todo command not found: {cmd_parts[0]} '
+                '(check todos.add_command in config.json)'
+            )
+        except subprocess.TimeoutExpired:
+            raise ValueError(f'todo command timed out: {cmd_parts[0]}')
+        if result.returncode != 0:
+            detail = (result.stderr.strip() or result.stdout.strip()
+                      or f'exit {result.returncode}')
+            raise ValueError(f'could not add todo: {detail}')
+        return [types.TextContent(type='text', text=f'Added todo: {title}')]
 
     if name == 'send_notification':
         title = arguments.get('title', '')

@@ -33,6 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $BASE = dirname(__FILE__) . '/..';
+require_once dirname(__FILE__) . '/agent_client.php';
+
 $config_path = $BASE . '/config/config.json';
 if (!file_exists($config_path)) {
     http_response_code(500);
@@ -100,57 +102,13 @@ $payload = array(
     'user_message'  => $user_message,
     'shared_secret' => isset($body['shared_secret']) ? (string)$body['shared_secret'] : '',
 );
-$payload_json = json_encode($payload);
 
-$python = $BASE . '/.venv/bin/python3';
-$script = $BASE . '/src/agent/chat_handler.py';
-if (!is_executable($python) || !file_exists($script)) {
-    http_response_code(500);
-    echo json_encode(array('ok' => false, 'error' => 'agent runtime missing'));
-    exit;
-}
-
-$descriptors = array(
-    0 => array('pipe', 'r'),
-    1 => array('pipe', 'w'),
-    2 => array('pipe', 'w'),
-);
-$cwd = $BASE;
-$env = null;
-
-$cmd = escapeshellarg($python) . ' ' . escapeshellarg($script);
-$proc = proc_open($cmd, $descriptors, $pipes, $cwd, $env);
-if (!is_resource($proc)) {
-    http_response_code(500);
-    echo json_encode(array('ok' => false, 'error' => 'failed to spawn agent'));
-    exit;
-}
-
-fwrite($pipes[0], $payload_json);
-fclose($pipes[0]);
-
-$stdout = stream_get_contents($pipes[1]);
-$stderr = stream_get_contents($pipes[2]);
-fclose($pipes[1]);
-fclose($pipes[2]);
-$status = proc_close($proc);
-
-if ($status !== 0 || $stdout === false || trim($stdout) === '') {
-    http_response_code(500);
-    $err = trim($stderr);
-    if (strlen($err) > 500) { $err = substr($err, 0, 500) . '…'; }
-    echo json_encode(array(
-        'ok' => false,
-        'error' => 'agent failed (exit ' . (int)$status . ')',
-        'stderr' => $err,
-    ));
-    exit;
-}
-
-$result = json_decode($stdout, true);
-if (!is_array($result)) {
-    http_response_code(500);
-    echo json_encode(array('ok' => false, 'error' => 'agent returned non-JSON', 'raw' => $stdout));
+$result = db_run_agent($BASE, $payload);
+if (isset($result['http'])) {
+    http_response_code((int)$result['http']);
+    unset($result['http']);
+    while (ob_get_level() > 0) { ob_end_clean(); }
+    echo json_encode($result);
     exit;
 }
 

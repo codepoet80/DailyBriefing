@@ -25,6 +25,7 @@ Runs on macOS or Raspberry Pi. Frontend is compatible with a 2011 webOS TouchPad
 - Tomorrow preview (afternoon/evening runs)
 - XKCD (when a new comic is out)
 - Chat box — talk to the same MCP-tool surface from any device that can render basic HTML (incl. legacy browsers like the 2011 webOS TouchPad)
+- Voice webhook — reach that same agent from an Index.01 ring; the reply comes back as a push notification
 
 ## Setup
 
@@ -203,7 +204,7 @@ A chat box at the bottom of the briefing page lets you reach the same MCP tool s
 
 `allowed_tools` is a subset of the MCP server's full surface — set it to whatever you're comfortable exposing through a webpage. Adding a tool to `mcp_server.py` does **not** auto-expose it to the web chat; the name must also appear in this list. The chat box only renders when `enabled: true`. Leave `shared_secret` blank to skip auth (page reachability == chat reachability) or set a passphrase the browser stores in `localStorage`.
 
-Per-device sessions are persisted under `data/chat_sessions/<id>.json`; on page load the last few turns are pre-rendered so the chat doesn't feel "empty."
+Per-device sessions are persisted under `data/chat_sessions/<id>.json`; on page load the last few turns are pre-rendered so the chat doesn't feel "empty." If the voice webhook below is enabled, its turns are merged into that same log by timestamp and marked "via ring," so what you said to the ring is visible on the page. Set `chat_agent.history_turns` to change how many turns are pre-rendered (default 6).
 
 **If you serve behind nginx**, raise its upstream timeout — `chat.php` sets PHP's own limit to 300s, but nginx defaults to 60s and will return `504 Gateway Time-out` on long tool loops (refreshing the briefing, summarizing a large dialectic, etc.):
 
@@ -213,7 +214,46 @@ fastcgi_read_timeout 300;
 fastcgi_send_timeout 300;
 ```
 
-(Use `proxy_read_timeout` / `proxy_send_timeout` if your nginx proxies via `proxy_pass` rather than `fastcgi_pass`.) The same applies to other reverse proxies.
+(Use `proxy_read_timeout` / `proxy_send_timeout` if your nginx proxies via `proxy_pass` rather than `fastcgi_pass`.) The same applies to other reverse proxies. It applies to `webhook.php` below as well.
+
+## Voice webhook (Index.01 ring)
+
+`web/webhook.php` gives the [Index.01](https://help.repebble.com/en/articles/15724406-index-advanced-features-mcp-webhook) ring the same agent by voice. The ring transcribes on-device and POSTs `multipart/form-data` (`transcription`, optional `audio`, `recordedAt`, `client`); the endpoint runs the transcription through the same `chat_handler.py` the chat box uses and pushes the reply to your phone via Pushover — the ring has no screen, and the vendor docs don't say whether the HTTP response is surfaced, so the reply is also returned in the response body.
+
+```json
+"webhook": {
+  "enabled": true,
+  "token": "long-random-string",
+  "session_id": "index01-ring",
+  "reply_via_pushover": true,
+  "max_reply_chars": 900,
+  "dedupe_seconds": 600,
+  "save_audio": false
+}
+```
+
+In the Index app: URL `https://your-host/webhook.php`, custom header `Authorization: Bearer <token>`, Send = transcription (audio-only is rejected — there's no speech-to-text on this end). The ring requires **HTTPS with a real certificate**. The endpoint refuses to start with an empty `token`, since unlike the chat box it's meant to face the internet.
+
+Because speech-to-text is lossy and the ring has no screen, the agent is told to **capture rather than guess**: when a transcription is too garbled or ambiguous to act on confidently, it files the best literal reading as a todo with ` [via ring]` on the end and tells you it did, instead of guessing at an action or asking a question you might not read for hours.
+
+A repeat is thrown away rather than re-run, so a retry or a double press can't send a message or log a workout twice: within `dedupe_seconds`, a POST is treated as a duplicate if it carries the same `recordedAt` **or** the same transcription text as the request immediately before it (compared with case, punctuation and whitespace normalised away, since speech-to-text isn't byte-stable). Duplicates replay the previous reply, return `duplicate: true`, and never reach the agent. A fixed `session_id` means consecutive taps continue one conversation. Requests are logged to `data/webhook.log`.
+
+**Exposing it publicly.** The ring needs HTTPS from the internet, but the briefing page shouldn't be public — so publish only the webhook, by reverse-proxying one exact path from a server you already expose to the briefing host, ideally over a private mesh (Tailscale/WireGuard) so the briefing host needs no port-forward at all.
+
+Three things to get right:
+
+- Use an **exact-match** `location =` for the proxied path, never a prefix — under a prefix match, `/<path>/../chat.php` reaches the chat agent.
+- nginx matches `location ~ \.php$` **before** `location /`, so an IP guard written in `location /` does **not** protect your PHP files. Repeat it inside the regex block, or `chat.php` answers anything that can reach the port.
+- Raise `proxy_read_timeout` and `fastcgi_read_timeout` to 300s on both hops. The default 60s 504s a long tool loop that is still running — you get an error on screen and the answer on your phone a minute later.
+
+Keep your real nginx files out of version control; they name hosts and internal addresses. `config/nginx/` is gitignored for that reason.
+
+```bash
+curl -X POST https://your-host/webhook.php \
+  -H 'Authorization: Bearer <token>' \
+  -F 'transcription=what is on my calendar today' \
+  -F "recordedAt=$(date +%s)000" -F 'client=ring'
+```
 
 ## Health tracking
 

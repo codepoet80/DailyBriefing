@@ -715,6 +715,18 @@ h2 {
     margin-right: 4px;
 }
 
+/* Turns that came in from the Index.01 ring rather than this browser. */
+.chat-turn-ring {
+    border-left: 3px solid #b8860b;
+    padding-left: 6px;
+}
+
+.chat-via {
+    font-size: 11px;
+    color: #8a6d0b;
+    margin-right: 4px;
+}
+
 .chat-tools {
     font-size: 11px;
     color: #777;
