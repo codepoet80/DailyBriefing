@@ -5,15 +5,41 @@ turn we spin up `src/mcp_server.py` as a stdio MCP subprocess, list the tools
 it advertises, filter by the configured allowlist, translate the schemas to
 Anthropic's tool-use format, and shut everything down when the request ends.
 """
+import os
 from contextlib import asynccontextmanager
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.client.stdio import get_default_environment
+
+# Variables the MCP server needs that get_default_environment() does not pass
+# through. It ships a deliberately minimal allowlist (PATH, HOME, ...), so
+# anything here has to be forwarded explicitly.
+_PASSTHROUGH_ENV = ('DB_DATA_DIR',)
+
+
+def _server_env():
+    """Environment for the MCP subprocess: the SDK default plus our own vars.
+
+    DB_DATA_DIR matters most. The MCP server performs nearly every data write —
+    health logs, dialectics, agent state — so if the override does not reach it,
+    a test that looks isolated still writes to the real data directory. That
+    happened: three health entries landed in live data while DB_DATA_DIR was set
+    on both the PHP and chat-handler sides.
+    """
+    env = dict(get_default_environment())
+    for key in _PASSTHROUGH_ENV:
+        val = os.environ.get(key)
+        if val:
+            env[key] = val
+    return env
 
 
 @asynccontextmanager
 async def mcp_session(server_command, server_args):
-    params = StdioServerParameters(command=server_command, args=server_args)
+    params = StdioServerParameters(
+        command=server_command, args=server_args, env=_server_env()
+    )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()

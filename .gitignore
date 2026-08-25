@@ -1,5 +1,8 @@
 .DS_Store
 .mcp.json
+# Local agent overrides (machine-specific)
+CLAUDE.local.md
+
 # Live configs — use *.example as the template
 config/config.json
 config/agent_rules.json

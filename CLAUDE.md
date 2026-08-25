@@ -74,170 +74,6 @@ A self-hosted morning dashboard that aggregates calendars, news, todos, Geek New
 php -S 0.0.0.0:8181 -t web/
 ```
 
-## File Layout
-
-```
-config/
-  config.json          # Live config with credentials (gitignored)
-  config.json.example  # Safe template to commit
-  feeds.json           # RSS feed list
-  feeds.json.example   # Template
-data/
-  briefing.json        # Written by cron, read by PHP
-  xkcd_state.json      # Persists last-seen XKCD comic number
-  briefing.log         # Cron output log
-  conversations/       # Saved dialectics (one JSON per id)
-  chat_sessions/       # Per-device web-chat sessions (rolling 20-turn window)
-  health/              # weight.jsonl / alcohol.jsonl / exercise.jsonl
-src/
-  build_briefing.py    # Orchestrator — run this directly to test
-  fetch_verse.py       # BibleGateway VOTD RSS (falls back to ESV API if key provided)
-  fetch_calendars.py   # CalDAV/ics fetcher — supports ownCloud WebDAV and direct URLs
-  fetch_news.py        # RSS feed fetcher (uses requests for timeout safety)
-  cluster_news.py      # Story deduplication/importance module (swappable)
-  fetch_geek_news.py   # HN Firebase API + Slashdot RSS, interleaved
-  fetch_xkcd.py        # XKCD API with new-comic state tracking
-  fetch_todos.py       # Runs `checkmate ls` and parses output
-  fetch_weather.py     # Open-Meteo API (no key needed), lat/lon from config
-  fetch_servers.py     # Fetches status pages, parses btn-success/btn-danger Bootstrap classes
-  fetch_local_services.py # Checks this box's own app servers via `ps aux` / `docker ps`
-  fetch_greeting.py    # Time-of-day greeting + ZenQuotes daily quote
-  fetch_unifi.py       # Unifi Protect overnight security event summary
-  fetch_imessage.py    # Overnight iMessage summary via the BlueBubbles server API
-  bluebubbles.py       # Shared BlueBubbles REST client (auth, chat/message/contact queries, send)
-  contacts_mac.py      # Name -> number lookup from this Mac's Contacts (labels, couple convention)
-  scheduled_send.py    # launchd-driven sweeper for delayed send_message (retry + delivery confirmation)
-  fetch_health.py      # Reads data/health/*.jsonl, returns latest+sparkline+trend per metric
-  fetch_reading.py     # Papyrus eReader book progress (webOS Account sync, or legacy local dir)
-  webos_account.py     # Read-only client for the webOS Archive app-storage service
-                       # (auth + scrambled-record decode; port of the community JS SDK)
-  mcp_server.py        # MCP server — exposes briefing + ~17 tools (dialectic, todos, calendar,
-                       # message, push, refresh, health logging, get_time, get_public_ip, ...)
-  run_agent.py         # Proactive Pushover agent (rules-based, runs after every build)
-  agent/
-    chat_handler.py    # Web-chat agent loop. Stdin JSON -> Anthropic tool-use loop -> stdout JSON.
-                       # System prompt is split: stable (cached) + volatile briefing data.
-    mcp_bridge.py      # Spawns src/mcp_server.py over stdio MCP, adapts schemas for Anthropic API
-    sessions.py        # Read/write data/chat_sessions/<id>.json; prune CLI for run.sh
-web/
-  index.php            # PHP renderer, PHP 7.4 compatible. Pre-renders trailing chat turns from cookie.
-  style.css            # Old WebKit compatible (no Grid, no CSS vars)
-  chat.php             # POST endpoint: shells out to src/agent/chat_handler.py, sets session cookie
-  webhook.php          # Token-auth webhook for the Index.01 ring — same agent, reply via Pushover
-  agent_client.php     # Shared db_run_agent() / db_pushover() helpers used by chat.php + webhook.php
-  chat.js              # ES5 + XHR chat client. Manages local secret, spinner, status line.
-  spinner.gif          # 24x24 8-frame animated GIF (ImageMagick-generated) for thinking state
-  manifest.json        # PWA manifest for Android installability
-  icon.png             # 512px source icon (generate resized icons with ImageMagick)
-run.sh                 # Entry point: creates .venv, installs deps, runs build + agent + prune sessions
-requirements.txt       # requests, icalendar, recurring_ical_events, feedparser, anthropic, mcp
-```
-
-## Config Reference (`config/config.json`)
-
-```json
-{
-  "owncloud": {
-    "base_url": "https://your-owncloud",
-    "username": "...",
-    "password": "...",
-    "ssl_verify": false        // false for self-signed LAN certs
-  },
-  "calendars": {
-    "mine": [
-      { "name": "Work", "url": "/remote.php/dav/calendars/user/cal/?export" },
-      { "name": "Jon",  "url": "https://calendar.zoho.com/ical/..." }
-    ],
-    "family": [
-      { "name": "Nicole", "url": "https://...", "color": "#6600cc" },
-      { "name": "Ben",    "url": "https://...", "color": "#993333" }
-    ]
-  },
-  "servers": [
-    { "name": "my-site.com", "url": "https://my-site.com/status/" }
-  ],
-  "local_services": [   // app servers on THIS box; type "process" (ps aux) or "docker" (docker ps)
-    { "name": "BlueBubbles", "type": "process", "match": "bluebubbles" },
-    { "name": "Docker",      "type": "process", "match": "docker.app" },
-    { "name": "Plex",        "type": "process", "match": "plex media server" }
-  ],
-  "weather": {
-    "latitude": 41.58,
-    "longitude": -81.20,
-    "units": "fahrenheit"   // or "celsius"
-  },
-  "bible": {
-    "translation": "ESV",
-    "esv_api_key": ""          // get free key at esv.org/api; blank = BibleGateway NIV
-  },
-  "geek_news": { "count": 20 },
-  "news": {
-    "importance_threshold": 2, // min sources for a story to be elevated
-    "similarity_threshold": 0.65,
-    "max_important": 15,
-    "max_regular": 30,
-    "title_filters": ["coupon"]  // case-insensitive substrings; matching titles excluded before counting
-  },
-  "greeting": {
-    "name": "Jon"              // first name for time-of-day greeting
-  },
-  "unifi": {
-    "host": "https://192.168.x.x",
-    "username": "...",
-    "password": "...",
-    "night_start_hour": 22,    // overnight window start (default 10pm)
-    "night_end_hour": 6        // overnight window end (default 6am)
-  },
-  "bluebubbles": {
-    "url": "http://localhost:1234",
-    "password": "...",         // BlueBubbles server password (Settings > API & Webhooks)
-    "method": "apple-script",  // send method: "apple-script" (default) or "private-api"
-    "night_start_hour": 22,    // overnight message summary window
-    "night_end_hour": 6,
-    "night_end_minute": 30
-  },
-  "todos": {
-    "command": "checkmate ls",      // any CLI that outputs "○ N. Title" lines
-    "add_command": "checkmate add", // used by the add_todo MCP tool
-    "count": 8
-  },
-  "calendar_filters": {
-    "exclude_titles": ["Morning Routine"]  // exact-match event titles to suppress
-  },
-  "reading": {
-    "mode": "account",         // "account" (webOS Account sync) or "webdav" (legacy local dir)
-    "account": {
-      "login": "you@example.com",   // webOS Account email
-      "password": "",               // webOS Account password
-      "app_id": "com.palm.codepoet.papyrus",
-      "device_name": "DailyBriefing"  // label in the account's device list
-    },
-    "papyrus_dir": "~/ownCloud/Dropbox/.papyrus",  // mode "webdav" only
-    "stagnant_days": 7,        // days without progress before a book reads as stagnant
-    "max_inactive_days": 30,   // books untouched longer than this are dropped
-    "exclude_titles": []
-  },
-  "health": {
-    "weight":   { "unit": "lbs", "goal_direction": "down" },
-    "alcohol":  { "weekly_target_drinks": 15 },
-    "exercise": { "weekly_target_minutes": 150 },
-    "joy":      { "scale_max": 5 },   // subjective 1..scale_max mood rating
-    "missed_notify_hour": 7,    // health_missing rule won't fire before this hour
-    "chart_days": 30            // sparkline length
-  },
-  "chat_agent": {
-    "enabled": true,
-    "model": "claude-sonnet-4-6",
-    "shared_secret": "",        // blank = no auth (page reachable = chat reachable)
-    "max_turns_in_context": 20,
-    "session_ttl_hours": 24,
-    "max_tool_iterations": 8,
-    "allowed_tools": ["dialectic_save", "refresh_briefing", ...],  // subset of mcp_server.py tools
-    "system_prompt_extra": ""
-  }
-}
-```
-
 ## Feed Config (`config/feeds.json`)
 
 Each feed entry:
@@ -629,32 +465,10 @@ webhook.php → db_run_agent() → chat_handler.py → mcp_server.py → reply
 webhook.php → Pushover push to Jon's phone  +  JSON body with the same text
 ```
 
-### What the ring sends
-
-`POST` `multipart/form-data`, plus any custom headers configured in the app:
-
-| Field | Notes |
-|---|---|
-| `transcription` | plain text; present when *text transmission* is enabled |
-| `audio` | `audio/mp4` (M4A); present when *audio transmission* is enabled |
-| `recordedAt` | ms since epoch; always sent |
-| `client` | always `ring` |
-
-Set the app's **Send** option to transcription (or both). **Audio-only is
-rejected with a 400** — there is no speech-to-text on this end, and silently
-accepting it would look like the ring was being ignored.
-
-### Setup
-
-1. `config.webhook.token` — a long random string. The endpoint **refuses to run
-   with an empty token** (unlike the chat box, whose reachability is the page's
-   own; this URL is meant to face the internet).
-2. In the Index app: URL `https://your-host/webhook.php`, custom header
-   `Authorization: Bearer <that token>`, Send = transcription, pick a trigger.
-   `Bearer <t>`, `Token <t>`, a bare token, and `X-Webhook-Token` are all accepted.
-3. The ring requires **HTTPS**, so the endpoint needs a real certificate — a LAN
-   self-signed cert will not do. The briefing itself stays on the LAN; only the
-   webhook is published, via reverse proxy (below).
+Setup steps, the ring's multipart field table, and the `webhook` config
+block live in the `index01-webhook` skill — load it when configuring the
+endpoint. What stays here is the part you need without asking: the security
+gotchas, the capture-on-doubt rule, and the dedupe rationale.
 
 ### Publishing it
 
@@ -711,23 +525,6 @@ response body as both `reply` and `text`. Turn the push off with
 Because of that same unknown, the endpoint sets `ignore_user_abort(true)`: if the
 ring gives up waiting, the turn still finishes and the push still lands. Typical
 round trip is 3–6s.
-
-### Config (`config.json` → `webhook`)
-
-```json
-{
-  "enabled": true,
-  "token": "long-random-string",   // required; no token = 500, never wide open
-  "session_id": "index01-ring",    // fixed id → follow-ups work across taps
-  "reply_via_pushover": true,
-  "pushover_title": "Index",
-  "pushover_priority": 0,
-  "max_reply_chars": 900,          // Pushover truncates past ~1024
-  "dedupe_seconds": 600,
-  "save_audio": false,             // write M4As to data/webhook_audio/ for debugging
-  "system_prompt_extra": ""        // appended to the ring's client context
-}
-```
 
 ### Capture-on-doubt
 
@@ -866,23 +663,6 @@ The target-based design for alcohol/exercise is intentional: slope alone mislead
 `render_sparkline()` in `index.php` emits a row of `<div class="bar">`s with percentage heights (weight and joy only). Old-WebKit safe — no SVG, no canvas. Weight uses tight min-max scaling (small changes visible); joy uses a fixed 1..scale_max scale (via `$fixed_min`/`$fixed_max`) so a "5" is full height and a "2" is low.
 
 `render_week_bars()` renders the alcohol/exercise weekly charts. Both the bars and the dashed target line are **absolutely positioned from the same 2px floor over a 28px range**, so a bar of value `v` tops out at exactly `2 + (v/maxv)*28` — the same coordinate the target line uses. (Do not revert the bars to in-flow inline-block: mixing in-flow bars with an absolute target line puts them in different vertical frames and the "above/below target" read drifts by a couple pixels.) Weekly `maxv` gets 1.2× headroom above the taller of the max bar / target.
-
-## MCP Tools (full inventory)
-
-Defined in `src/mcp_server.py`. The desktop session has all of them; the web chat sees only those listed in `config.chat_agent.allowed_tools`.
-
-| Tool | Purpose |
-|---|---|
-| `refresh_briefing` | Rebuild `data/briefing.json` by shelling out to `build_briefing.py` |
-| `add_todo` | Append via `checkmate add` |
-| `add_calendar_event` | Create a CalDAV event on any `writable: true` calendar |
-| `send_notification` | Push via Pushover (priority -1/0/1) |
-| `send_message` | iMessage/SMS via the local BlueBubbles server, optional `delay_minutes` |
-| `dialectic_save` / `_append` / `_list` / `_get` / `_summary` / `_close` / `_resume` | See Dialectics section. `_summary` returns compact recap (first + last N turns) — use for "what was that about"-style asks. |
-| `log_weight` / `log_alcohol` / `log_exercise` / `log_joy` | Append to `data/health/*.jsonl` |
-| `get_health_summary` | Live read of `data/health/*.jsonl`, returns compact stats |
-| `get_time` | Local time + ISO + UTC |
-| `get_public_ip` | Hits `api.ipify.org` (5s timeout) |
 
 ## Dialectics
 

@@ -97,7 +97,13 @@ def _build_stable_system_text(config):
         "- Prefer one tool call per request when possible. If a call fails, summarize "
         "the failure and ask before retrying with different arguments.\n"
         "- After any write action, briefly confirm what you did in plain language; "
-        "don't paste raw JSON results back at the user.",
+        "don't paste raw JSON results back at the user.\n"
+        "- Earlier turns in this conversation are a record of what has ALREADY "
+        "happened, not a list of pending work. An assistant turn marked "
+        "'[Already completed in this turn: ...]' means those tools ran and their "
+        "effects are permanent. Never re-issue a tool call on behalf of an "
+        "earlier message — act only on the newest user message. Re-running a log "
+        "or a send writes a duplicate; there is no undo.",
 
         "Briefing JSON schema reference (top-level keys that may be present):\n"
         "- greeting: {greeting, quote, author}\n"
@@ -248,13 +254,24 @@ def _build_system_blocks(config, briefing, active_dialectic_id=None, client_cont
 
 
 def _turns_to_messages(turns):
-    """Convert stored turns to Anthropic message list. Drops tool-use detail."""
+    """Convert stored turns to an Anthropic message list.
+
+    Real tool_use/tool_result blocks are NOT replayed — the rolling window can
+    trim a tool_use away from its tool_result, which the API rejects. Instead
+    each assistant turn carries a compact note of what it actually ran, because
+    plain text alone reads as an unfulfilled intention: a ring session where
+    "Logged 4 drinks" sat in the history had log_alcohol re-issued verbatim
+    four turns later, writing a second entry under a different date.
+    """
     out = []
     for t in turns:
         role = t.get('role')
         content = t.get('content', '')
         if role not in ('user', 'assistant') or not content:
             continue
+        if role == 'assistant' and t.get('tools'):
+            content = (content + '\n[Already completed in this turn: '
+                       + ', '.join(t['tools']) + ']')
         out.append({'role': role, 'content': content})
     return out
 
@@ -383,7 +400,10 @@ async def _run_turn(config, state, user_message, client_context=''):
     if not reply_text:
         reply_text = '(no reply)'
 
-    sessions.append_turn(state, 'assistant', reply_text)
+    sessions.append_turn(
+        state, 'assistant', reply_text,
+        tools=[e['name'] for e in tool_events if e.get('name')],
+    )
     sessions.trim(state, int(chat_cfg.get('max_turns_in_context') or 20))
 
     return {

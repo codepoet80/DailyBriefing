@@ -77,8 +77,17 @@ def new_state():
     }
 
 
-def append_turn(state, role, content):
-    state['turns'].append({'role': role, 'content': content, 'at': _now()})
+def append_turn(state, role, content, tools=None):
+    """Record a turn. `tools` is the list of tool names that ran on this turn.
+
+    The tool names matter on replay: the stored history is plain text, so
+    without them the model cannot tell an action it already performed from one
+    it merely said it would perform, and re-issues the call on a later turn.
+    """
+    turn = {'role': role, 'content': content, 'at': _now()}
+    if tools:
+        turn['tools'] = list(tools)
+    state['turns'].append(turn)
 
 
 def trim(state, max_turns):
