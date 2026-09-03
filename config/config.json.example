@@ -201,6 +201,11 @@
     "system_prompt_extra": ""
   },
   "contacts": {
+    "nicknames": {
+      "my wife": "Dana Rivera",
+      "nick": "Dana Rivera",
+      "my son": "Sam Okafor"
+    },
     "couple_gender": {
       "alex": "m",
       "sam": "m",

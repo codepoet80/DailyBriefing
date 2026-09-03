@@ -383,6 +383,15 @@ which exposes one source (232 of 335 contacts here) and returns **no labels**.
 
 ### Resolution order
 
+0. **Nickname** — an exact match in `contacts.nicknames` (config.json) short-
+   circuits everything: `{"nick": "Nicole Wise", "my wife": "Nicole Wise"}`.
+   Values may be a contact name, a phone number, or an email. This is the only
+   way to make a word mean someone the address book spells differently, and it
+   outranks the name search on purpose — otherwise "nick" reaches whichever
+   real contact is named Nick. If the mapped name matches **no** contact the
+   resolver reports that and sends nothing; it deliberately does *not* fall
+   back to searching for the alias itself, because that is exactly how an alias
+   would reach a stranger who shares the nickname.
 1. Phone/email input → existing 1:1 chat with that address, else `new`.
 2. **Strong** contact match (exact full, first, or last name) → that person.
 3. Group chat by its own `displayName` — exact always; partial only when

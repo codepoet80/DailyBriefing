@@ -50,6 +50,15 @@ _COUPLE_RE = re.compile(r'^\s*(.+?)\s+(?:and|&)\s+(.+?)\s*$', re.I)
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            '..', 'config', 'config.json')
 _COUPLE_GENDER = None
+_NICKNAMES = None
+
+
+def _contacts_config(key):
+    try:
+        with open(CONFIG_PATH) as f:
+            return (json.load(f).get('contacts') or {}).get(key) or {}
+    except (OSError, ValueError):
+        return {}
 
 
 def couple_gender():
@@ -62,13 +71,23 @@ def couple_gender():
     """
     global _COUPLE_GENDER
     if _COUPLE_GENDER is None:
-        try:
-            with open(CONFIG_PATH) as f:
-                table = (json.load(f).get('contacts') or {}).get('couple_gender') or {}
-            _COUPLE_GENDER = {str(k).strip().lower(): v for k, v in table.items()}
-        except (OSError, ValueError):
-            _COUPLE_GENDER = {}
+        _COUPLE_GENDER = {str(k).strip().lower(): v
+                          for k, v in _contacts_config('couple_gender').items()}
     return _COUPLE_GENDER
+
+
+def nicknames():
+    """{alias: contact name / phone / email} from `contacts.nicknames`.
+
+    Lets "my wife" or "nick" name a person the address book spells differently.
+    Keys are normalized the same way queries are, so "My Wife" matches.
+    """
+    global _NICKNAMES
+    if _NICKNAMES is None:
+        _NICKNAMES = {normalize_name(k): str(v).strip()
+                      for k, v in _contacts_config('nicknames').items()
+                      if normalize_name(k) and str(v).strip()}
+    return _NICKNAMES
 
 
 def _clean_label(raw):
@@ -88,6 +107,13 @@ def normalize_number(addr):
     if len(digits) == 11 and digits.startswith('1'):
         digits = digits[1:]
     return digits
+
+
+def _looks_like_phone(value):
+    """A nickname may map straight to a number instead of a contact name."""
+    v = (value or '').strip()
+    return bool(v) and sum(ch.isdigit() for ch in v) >= 7 and not any(
+        ch.isalpha() for ch in v)
 
 
 def normalize_name(name):
@@ -285,7 +311,7 @@ def find(query, contacts=None):
 _WEAK_TIER = 3
 
 
-def resolve_name(query, contacts=None):
+def resolve_name(query, contacts=None, _in_alias=False):
     """Resolve a name to one sending address.
 
     Returns (status, payload):
@@ -298,6 +324,28 @@ def resolve_name(query, contacts=None):
     comes back as a pick-list, because silently guessing a recipient means
     texting the wrong person.
     """
+    alias = nicknames().get(normalize_name(query))
+    if alias and not _in_alias:
+        # An explicit mapping outranks any name search: "nick" must mean the
+        # person configured, never the contact who happens to be called Nick.
+        if '@' in alias or _looks_like_phone(alias):
+            return 'found', {'name': alias, 'address': alias, 'label': '',
+                             'tier': 0, 'contact': None}
+        status, payload = resolve_name(alias, contacts, _in_alias=True)
+        if status == 'found':
+            payload['tier'] = 0  # configured on purpose — treat as exact
+            return status, payload
+        if status == 'ambiguous':
+            return status, payload
+        # Mapping points at a contact that does not exist. Say so; do NOT fall
+        # back to searching for the alias itself — that is how "abby" would
+        # reach a different real person named Abby.
+        return 'ambiguous', {
+            'reason': ('nickname "%s" maps to "%s" in config, but there is no '
+                       'such contact' % (query, alias)),
+            'tier': 0, 'options': [],
+        }
+
     scored = find_scored(query, contacts)
     if not scored:
         return 'missing', None
@@ -311,6 +359,29 @@ def resolve_name(query, contacts=None):
                 'address': phone['number'] if phone else None,
                 'label': (phone or {}).get('label', '')}
 
+    # Rivals that would send to the same number are not a real choice. The same
+    # person often appears twice — once per account store, spelled differently
+    # ("Eli Wise" in one, "Elisa Wise" nicknamed Eli in another) — and asking
+    # "which of these two?" when both are one phone is just noise.
+    def destination(contact):
+        phone = best_phone(contact)
+        return phone['normalized'] if phone else None
+
+    def distinct(contacts_):
+        seen, out = set(), []
+        for c in contacts_:
+            d = destination(c)
+            if d is None or d not in seen:
+                if d is not None:
+                    seen.add(d)
+                out.append(c)
+        return out
+
+    top = distinct(top)
+    rivals = distinct([c for t, c in others if t < _WEAK_TIER])
+    top_dests = {destination(c) for c in top}
+    rivals = [c for c in rivals if destination(c) not in top_dests]
+
     if len(top) > 1:
         return 'ambiguous', {
             'reason': 'several contacts match "%s"' % query,
@@ -319,12 +390,12 @@ def resolve_name(query, contacts=None):
         }
 
     # A single strong match still loses to a near-equal runner-up.
-    if others and best_tier <= 1 and any(t < _WEAK_TIER for t, _ in others):
+    if rivals and best_tier <= 1:
         return 'ambiguous', {
             'reason': 'more than one contact could match "%s"' % query,
             'tier': best_tier,
             'options': [opt(c, best_phone(c)) for c in top]
-                       + [opt(c, best_phone(c)) for t, c in others if t < _WEAK_TIER],
+                       + [opt(c, best_phone(c)) for c in rivals],
         }
 
     contact = top[0]
