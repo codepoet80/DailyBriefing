@@ -605,6 +605,31 @@ Residual false claims with no marker (e.g. the "already on your list" reply
 itself) are only covered by the prompt rule — verified 3/3 correct against the
 live poisoned session.
 
+### The push reports effects, not intentions
+
+`webhook.php` builds the Pushover body from **`tool_events`**, not from the
+agent's prose:
+
+```
+✓ Added todo: Test webhook          <- the tool's own result
+                                       (✗ … FAILED, and priority raised to 1,
+                                        when a write fails)
+Done — "Test webhook" added…        <- the agent's narration, secondary
+```
+
+A turn that ran no tools (a question) still pushes just the reply — nothing was
+claimed to change, so there is nothing to verify. The consequence that matters:
+an action-shaped request whose push has **no ✓ line did not happen**.
+
+This exists because narration is not evidence. The agent spent two days
+replying "added to your todo list" on turns where no tool ran, and the push
+repeated it faithfully every time. Tool results come from the effect, so they
+cannot report a write that did not occur.
+
+Same principle as the scheduled-send sweeper, which alerts on what happened at
+send time rather than confirming at schedule time: **confirm on effect, never on
+intent.** Apply it to any new notification path.
+
 ### Reading the webhook log
 
 `OUT tools=[...]` lists tools that ran; a failed one is suffixed `(failed)`

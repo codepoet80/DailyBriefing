@@ -276,14 +276,46 @@ if (empty($result['ok'])) {
 
 $reply = isset($result['reply']) ? trim((string)$result['reply']) : '';
 $max_chars = isset($wh['max_reply_chars']) ? (int)$wh['max_reply_chars'] : 900;
-$push_body = $reply;
-if ($max_chars > 0 && strlen($push_body) > $max_chars) {
-    $push_body = substr($push_body, 0, $max_chars - 1) . '…';
-}
+
+$events = isset($result['tool_events']) ? $result['tool_events'] : array();
 
 $tool_names = array();
-foreach ((isset($result['tool_events']) ? $result['tool_events'] : array()) as $ev) {
+foreach ($events as $ev) {
     if (!empty($ev['name'])) { $tool_names[] = $ev['name'] . (empty($ev['ok']) ? ' (failed)' : ''); }
+}
+
+// The push reports what ACTUALLY happened, not what the agent said it did.
+//
+// The reply is the agent's narration and can be wrong: it once claimed "added
+// to your todo list" on turns where no tool ran at all, and the push confirmed
+// that lie for two days. Tool results come from the effect itself, so they
+// cannot claim a write that did not occur. Same principle the scheduled-send
+// sweeper uses — confirm on effect, never on intent.
+//
+// Turns that ran no tools (questions) still push the reply: nothing was
+// claimed to change, so there is nothing to verify. The visible consequence is
+// that an action-shaped request with no "✓" line did not happen.
+$confirm_lines = array();
+$any_failed = false;
+foreach ($events as $ev) {
+    $name = !empty($ev['name']) ? (string)$ev['name'] : 'tool';
+    $summary = isset($ev['summary']) ? trim((string)$ev['summary']) : '';
+    if (empty($ev['ok'])) {
+        $any_failed = true;
+        $confirm_lines[] = '✗ ' . $name . ' FAILED' . ($summary !== '' ? ': ' . $summary : '');
+    } else {
+        $confirm_lines[] = '✓ ' . ($summary !== '' ? $summary : $name);
+    }
+}
+
+if ($confirm_lines) {
+    $push_body = implode("\n", $confirm_lines);
+    if ($reply !== '') { $push_body .= "\n\n" . $reply; }
+} else {
+    $push_body = $reply;
+}
+if ($max_chars > 0 && strlen($push_body) > $max_chars) {
+    $push_body = substr($push_body, 0, $max_chars - 1) . '…';
 }
 
 wh_log($BASE, 'OUT tools=[' . implode(', ', $tool_names) . '] reply=' . json_encode($reply));
@@ -304,6 +336,11 @@ $pushed = false;
 if (!empty($wh['reply_via_pushover']) && $push_body !== '') {
     $title = !empty($wh['pushover_title']) ? (string)$wh['pushover_title'] : 'Index';
     $priority = isset($wh['pushover_priority']) ? (int)$wh['pushover_priority'] : 0;
+    // A write that failed is not conversational — make sure it is noticed.
+    if ($any_failed) {
+        $title = $title . ' — action failed';
+        if ($priority < 1) { $priority = 1; }
+    }
     // A ring reply is conversational, not an alert — give it its own tone
     // rather than config.agent.pushover_sound, which is the alert sound.
     $sound = isset($wh['pushover_sound']) ? (string)$wh['pushover_sound'] : null;
