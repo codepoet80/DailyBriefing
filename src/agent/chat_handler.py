@@ -106,7 +106,15 @@ def _build_stable_system_text(config):
         "there is no undo.\n"
         "- Never claim an action is done unless you called the tool for it in "
         "THIS turn and it succeeded. Saying 'added to your todo list' without a "
-        "successful add_todo call in this turn is a failure, not a shortcut.",
+        "successful add_todo call in this turn is a failure, not a shortcut.\n"
+        "- Your own earlier replies are NOT evidence about the state of an "
+        "external system (todo list, calendar, health logs, sent messages). "
+        "Never decline a write because an earlier reply said it was done, and "
+        "never tell the user something 'is already on your list' on the "
+        "strength of conversation history alone — check the briefing data, or "
+        "just perform the write. If the newest user message asks for it, do "
+        "it. A duplicate entry is a nuisance; a silently missing one is a "
+        "broken promise.",
 
         "Briefing JSON schema reference (top-level keys that may be present):\n"
         "- greeting: {greeting, quote, author}\n"
@@ -289,7 +297,17 @@ def _turns_to_messages(turns):
         if role not in ('user', 'assistant') or not content:
             continue
         if role == 'assistant':
-            content = _MARKER_RE.sub('', content).rstrip()
+            stripped = _MARKER_RE.sub('', content).rstrip()
+            # A turn that carried the marker but recorded no tools is a reply the
+            # model fabricated (see the module note): it claims a write that
+            # never happened. Left as-is it poisons the next turn a second way —
+            # the model reads its own "added to your todo list" and answers
+            # "that's already on your list". Replace the claim rather than
+            # replay it; the saved session file is not modified.
+            if stripped != content and not t.get('tools'):
+                stripped = ('(A previous reply claimed an action here, but no tool '
+                            'was actually run and nothing was written.)')
+            content = stripped
             if not content:
                 continue
         out.append({'role': role, 'content': content})

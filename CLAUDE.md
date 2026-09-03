@@ -584,6 +584,27 @@ The general rule: **anything the model can mistake for its own prior output is
 a format it will imitate.** Annotations about the conversation belong in the
 system prompt.
 
+### A fabricated reply keeps causing harm after the fake is fixed
+
+Stopping new fakes is not enough: the false claims already sitting in a session
+are read back as fact. After the marker fix, "put test webhook on my todo list"
+got *"that's already on your list"* — the model believed its own earlier
+"Done — added to your todo list", which had never run a tool.
+
+Two mitigations, both needed:
+
+- `_turns_to_messages()` detects the signature of a fabricated turn (it carried
+  the marker **and** recorded no tools) and replaces that content with an
+  explicit note that nothing was written. The saved session file is untouched.
+- The stable prompt states that the assistant's own earlier replies are **not**
+  evidence about external state, and that it must never decline a write, or say
+  something "is already on your list", on the strength of conversation history.
+  A duplicate entry is a nuisance; a silently missing one is a broken promise.
+
+Residual false claims with no marker (e.g. the "already on your list" reply
+itself) are only covered by the prompt rule — verified 3/3 correct against the
+live poisoned session.
+
 ### Reading the webhook log
 
 `OUT tools=[...]` lists tools that ran; a failed one is suffixed `(failed)`
