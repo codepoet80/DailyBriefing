@@ -99,11 +99,14 @@ def _build_stable_system_text(config):
         "- After any write action, briefly confirm what you did in plain language; "
         "don't paste raw JSON results back at the user.\n"
         "- Earlier turns in this conversation are a record of what has ALREADY "
-        "happened, not a list of pending work. An assistant turn marked "
-        "'[Already completed in this turn: ...]' means those tools ran and their "
-        "effects are permanent. Never re-issue a tool call on behalf of an "
-        "earlier message — act only on the newest user message. Re-running a log "
-        "or a send writes a duplicate; there is no undo.",
+        "happened, not a list of pending work. Tools that already ran are listed "
+        "under 'Tools already executed earlier in this conversation'. Never "
+        "re-issue a tool call on behalf of an earlier message — act only on the "
+        "newest user message. Re-running a log or a send writes a duplicate; "
+        "there is no undo.\n"
+        "- Never claim an action is done unless you called the tool for it in "
+        "THIS turn and it succeeded. Saying 'added to your todo list' without a "
+        "successful add_todo call in this turn is a failure, not a shortcut.",
 
         "Briefing JSON schema reference (top-level keys that may be present):\n"
         "- greeting: {greeting, quote, author}\n"
@@ -216,11 +219,14 @@ def _build_stable_system_text(config):
     return '\n\n'.join(sections)
 
 
-def _build_volatile_system_text(briefing, active_dialectic_id, client_context=''):
+def _build_volatile_system_text(briefing, active_dialectic_id, client_context='',
+                                completed_actions=''):
     """The per-request half: briefing data and active dialectic state. Not cached."""
     sections = []
     if client_context:
         sections.append(client_context)
+    if completed_actions:
+        sections.append(completed_actions)
     if active_dialectic_id:
         sections.append(
             f'Active dialectic id for this session: {active_dialectic_id}. '
@@ -236,7 +242,8 @@ def _build_volatile_system_text(briefing, active_dialectic_id, client_context=''
     return '\n\n'.join(sections)
 
 
-def _build_system_blocks(config, briefing, active_dialectic_id=None, client_context=''):
+def _build_system_blocks(config, briefing, active_dialectic_id=None, client_context='',
+                         completed_actions=''):
     """Two-block system prompt: stable text (cached) then volatile text (uncached)."""
     return [
         {
@@ -247,21 +254,33 @@ def _build_system_blocks(config, briefing, active_dialectic_id=None, client_cont
         {
             'type': 'text',
             'text': _build_volatile_system_text(
-                briefing, active_dialectic_id, client_context
+                briefing, active_dialectic_id, client_context, completed_actions
             ),
         },
     ]
+
+
+_MARKER_RE = re.compile(r'\n?\[Already completed in this turn:[^\]]*\]\s*$')
 
 
 def _turns_to_messages(turns):
     """Convert stored turns to an Anthropic message list.
 
     Real tool_use/tool_result blocks are NOT replayed — the rolling window can
-    trim a tool_use away from its tool_result, which the API rejects. Instead
-    each assistant turn carries a compact note of what it actually ran, because
-    plain text alone reads as an unfulfilled intention: a ring session where
-    "Logged 4 drinks" sat in the history had log_alcohol re-issued verbatim
-    four turns later, writing a second entry under a different date.
+    trim a tool_use away from its tool_result, which the API rejects.
+
+    What each assistant turn actually ran is reported in the SYSTEM block (see
+    _completed_actions), never appended to the assistant's own text. An earlier
+    version wrote '[Already completed in this turn: add_todo]' into the message
+    content, where it was indistinguishable from words the model had written —
+    so the model learned the pattern and began emitting the marker itself
+    INSTEAD of calling the tool, replying "added to your todo list" when nothing
+    had been added. Reproduced at 2 failures in 3 runs against a real ring
+    session. Anything the model can mistake for its own prior output is a
+    format it will imitate.
+
+    Stored content is stripped of the marker on the way in, so sessions poisoned
+    by that bug recover without editing the saved history.
     """
     out = []
     for t in turns:
@@ -269,11 +288,30 @@ def _turns_to_messages(turns):
         content = t.get('content', '')
         if role not in ('user', 'assistant') or not content:
             continue
-        if role == 'assistant' and t.get('tools'):
-            content = (content + '\n[Already completed in this turn: '
-                       + ', '.join(t['tools']) + ']')
+        if role == 'assistant':
+            content = _MARKER_RE.sub('', content).rstrip()
+            if not content:
+                continue
         out.append({'role': role, 'content': content})
     return out
+
+
+def _completed_actions(turns):
+    """One line per past assistant turn that ran tools, for the system block.
+
+    Purpose is the same as the old inline marker — stop the model re-issuing a
+    write it already performed — but stated where the model reads instructions
+    rather than where it reads its own voice.
+    """
+    lines = []
+    for i, t in enumerate(turns):
+        if t.get('role') == 'assistant' and t.get('tools'):
+            lines.append('- exchange %d: %s' % (i // 2 + 1, ', '.join(t['tools'])))
+    if not lines:
+        return ''
+    return ('Tools already executed earlier in this conversation (their effects '
+            'are permanent — never re-issue them for an earlier message):\n'
+            + '\n'.join(lines))
 
 
 def _extract_text(content_blocks):
@@ -323,15 +361,20 @@ async def _run_turn(config, state, user_message, client_context=''):
     max_iter = int(chat_cfg.get('max_tool_iterations') or 8)
 
     briefing = _load_briefing()
-    system_blocks = _build_system_blocks(
-        config, briefing,
-        active_dialectic_id=state.get('active_dialectic_id'),
-        client_context=client_context,
-    )
 
     sessions.append_turn(state, 'user', user_message)
     sessions.trim(state, int(chat_cfg.get('max_turns_in_context') or 20))
     messages = _turns_to_messages(state['turns'])
+
+    # Built after the trim so the ledger describes exactly the turns the model
+    # can see — a note about an exchange that has fallen out of the window is
+    # worse than no note.
+    system_blocks = _build_system_blocks(
+        config, briefing,
+        active_dialectic_id=state.get('active_dialectic_id'),
+        client_context=client_context,
+        completed_actions=_completed_actions(state['turns']),
+    )
 
     client = anthropic.AsyncAnthropic(api_key=api_key)
     tool_events = []

@@ -555,6 +555,42 @@ while "what is the temperature" still just answers.
 `add_todo` must stay in `chat_agent.allowed_tools` for this to work — the webhook
 shares that allowlist.
 
+### Never write synthetic notes into assistant message content
+
+`chat_handler.py` replays history as plain text (real `tool_use`/`tool_result`
+blocks can't be replayed — the rolling window may trim a `tool_use` away from
+its `tool_result`, which the API rejects). It therefore has to tell the model
+what previous turns actually *did*.
+
+That note must go in the **system block** (`_completed_actions()`), never
+appended to the assistant's own text. An earlier version appended
+`[Already completed in this turn: add_todo]` to the stored reply. Inside an
+assistant turn it is indistinguishable from words the model wrote, so the model
+learned the pattern and started **emitting the marker instead of calling the
+tool** — replying "added to your todo list" with no `add_todo` call behind it.
+Ring todos silently stopped appearing while every Pushover reply said they had.
+
+Reproduced at **2 failures in 3 runs** against a real ring session; 4 of 4
+correct after moving the note to the system block. It is self-reinforcing:
+a faked reply is saved with the marker in its content, which teaches the next
+turn the same trick.
+
+Two guards now: `_turns_to_messages()` strips the marker from stored content on
+read (so poisoned sessions recover without editing saved history), and the
+stable prompt says never to claim an action without a successful tool call in
+the current turn.
+
+The general rule: **anything the model can mistake for its own prior output is
+a format it will imitate.** Annotations about the conversation belong in the
+system prompt.
+
+### Reading the webhook log
+
+`OUT tools=[...]` lists tools that ran; a failed one is suffixed `(failed)`
+(since the endpoint's first commit, so its absence in an old line is
+meaningful). An **empty** `tools=[]` on a turn whose reply claims a write is the
+signature of the faking bug above, not of a tool error.
+
 ### Voice-shaped replies
 
 `chat_handler.py` takes an optional `client_context` in its stdin payload,
