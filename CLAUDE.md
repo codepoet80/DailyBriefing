@@ -637,6 +637,43 @@ intent.** Apply it to any new notification path.
 meaningful). An **empty** `tools=[]` on a turn whose reply claims a write is the
 signature of the faking bug above, not of a tool error.
 
+### The ring never sends anything by accident
+
+Reaching this endpoint takes a press-and-hold, speech, and a release. There is
+no background capture and no accidental trigger, so **every transcription is
+deliberate** and the agent is told so explicitly. It must never decline an
+action because the message looks stray, unintended, blunt, or out of character —
+that is not its call. It once refused to send a text with *"That looks like a
+stray message… I'll let it go"*, which is a failure twice over: it asked a
+question (banned on a screen-less device) and then dropped the request entirely.
+
+Every turn must end in exactly one of: the action performed, a question answered
+from briefing data, or `add_todo` capture. Doing nothing is not an option.
+
+The context also says to read each message against the previous one — a bare
+fragment right after a texting exchange is the message he wants sent, not a
+stray remark.
+
+### Known mis-transcriptions (`webhook.transcription_fixes`)
+
+The ring's speech-to-text mishears the same command openings repeatedly —
+"text Nicole" arrives as "technically" often enough to be worth a lookup table
+instead of hoping the agent infers it:
+
+```json
+"transcription_fixes": { "technically": "text Nicole" }
+```
+
+**Anchored to the start of the message**, case-insensitive, on a word boundary.
+These are command openings; an unanchored rewrite would corrupt ordinary speech
+("that's technically true" must not become "that's text Nicole true"). Verified
+that mid-sentence uses and "Technicalities" are left alone.
+
+A false match is still possible ("Technically the server is down"), so the
+substitution is **logged** (`fix=[...] read_as=...`, alongside the original
+text) and **appended to the push** as `(heard "…")`. A rewrite that guessed
+wrong has to be visible — the push is the only place he sees anything.
+
 ### Voice-shaped replies
 
 `chat_handler.py` takes an optional `client_context` in its stdin payload,

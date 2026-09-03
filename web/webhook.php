@@ -39,6 +39,22 @@ $DEFAULT_CLIENT_CONTEXT =
     . "a short push notification on his phone. So answer in at most two or three short "
     . "plain-text sentences: no markdown, no bullet lists, no headings, no preamble. If "
     . "he asked you to do something, do it and confirm in one line.\n\n"
+    . "EVERY message you receive here is deliberate. Jon must press and hold a "
+    . "button, speak into the ring, and release it — there is no accidental or "
+    . "background capture, and nothing reaches you that he did not choose to say. "
+    . "So never treat input as stray, unintended, misdirected, or out of "
+    . "character, and NEVER decline an action on those grounds. Whether a message "
+    . "seems odd, blunt, affectionate, trivial, or oddly worded is not your "
+    . "concern and not your call. If he told you to send something, send it "
+    . "exactly as he said it — do not soften it, second-guess whether he really "
+    . "meant it, or withhold it for his own good.\n"
+    . "Doing nothing is never an available option. Every message ends in exactly "
+    . "one of: you performed the action, you answered from the briefing data, or "
+    . "you captured it with add_todo. \"I'll let it go\" is a failure.\n"
+    . "Read each message against the one before it. A transcription that looks "
+    . "like a fragment is usually the continuation of the exchange in progress — "
+    . "if your last turn was about texting someone, a bare phrase is the message "
+    . "he wants sent, not a stray remark.\n\n"
     . "NEVER ask a clarifying question. You cannot have a conversation over this "
     . "channel — Jon is talking to a ring with no screen and may not read the push "
     . "for hours, so a question just strands the request. If you are not confident "
@@ -196,6 +212,32 @@ if (strlen($transcription) > 4000) {
     wh_fail($BASE, 413, 'transcription too long');
 }
 
+// The ring's speech-to-text mishears the same command openings repeatedly —
+// "text Nicole" comes through as "technically" often enough to be worth a
+// lookup table rather than hoping the agent guesses. config.webhook
+// .transcription_fixes maps misheard -> intended.
+//
+// Anchored at the START of the message on purpose. These are command openings,
+// and an unanchored rewrite would corrupt ordinary speech: "that's technically
+// true" must not become "that's text Nicole true". A false match is still
+// possible ("Technically the server is down"), so the substitution is logged
+// and shown in the push — a wrong rewrite must be visible, not silent.
+$transcription_original = $transcription;
+$applied_fix = null;
+$fixes = isset($wh['transcription_fixes']) && is_array($wh['transcription_fixes'])
+    ? $wh['transcription_fixes'] : array();
+foreach ($fixes as $wrong => $right) {
+    $wrong = trim((string)$wrong);
+    if ($wrong === '') { continue; }
+    $pattern = '/^\s*' . preg_quote($wrong, '/') . '\b[\s,]*/i';
+    if (preg_match($pattern, $transcription)) {
+        $transcription = preg_replace($pattern, (string)$right . ' ', $transcription, 1);
+        $transcription = trim($transcription);
+        $applied_fix = $wrong . ' -> ' . $right;
+        break;
+    }
+}
+
 // --- one turn at a time, and never twice for one recording ---------------
 // The ring's retry behaviour is undocumented; a retry after a slow turn must
 // not run the agent (and its tools) a second time.
@@ -242,7 +284,8 @@ if ($lock) {
 }
 
 wh_log($BASE, 'IN client=' . $client . ' recordedAt=' . $recorded_at
-    . ' audio=' . ($has_audio ? 'yes' : 'no') . ' text=' . json_encode($transcription));
+    . ' audio=' . ($has_audio ? 'yes' : 'no') . ' text=' . json_encode($transcription_original)
+    . ($applied_fix ? ' fix=[' . $applied_fix . '] read_as=' . json_encode($transcription) : ''));
 
 // --- run the agent ------------------------------------------------------
 $session_id = isset($wh['session_id']) ? (string)$wh['session_id'] : 'index01-ring';
@@ -313,6 +356,11 @@ if ($confirm_lines) {
     if ($reply !== '') { $push_body .= "\n\n" . $reply; }
 } else {
     $push_body = $reply;
+}
+// If we rewrote what he said, say so — a bad substitution has to be caught by
+// eye, and the only place he sees anything is this push.
+if ($applied_fix !== null) {
+    $push_body .= "\n\n(heard \"" . $transcription_original . "\")";
 }
 if ($max_chars > 0 && strlen($push_body) > $max_chars) {
     $push_body = substr($push_body, 0, $max_chars - 1) . '…';

@@ -198,7 +198,10 @@
     "max_reply_chars": 900,
     "dedupe_seconds": 600,
     "save_audio": false,
-    "system_prompt_extra": ""
+    "system_prompt_extra": "",
+    "transcription_fixes": {
+      "technically": "text Dana"
+    }
   },
   "contacts": {
     "nicknames": {
