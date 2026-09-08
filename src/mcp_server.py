@@ -851,7 +851,12 @@ async def call_tool(name: str, arguments: dict):
                 lines.append(f'  • {opt["name"]}{label}: {opt["address"]}')
             lines.append('')
             lines.append('Nothing sent. Re-run with the exact name or the phone number.')
-            return [types.TextContent(type='text', text='\n'.join(lines))]
+            # Raise rather than return: nothing was sent, so this is a failed
+            # send, not a successful one that happens to describe a menu. As a
+            # plain result it came back ok=True, which told the ring's push
+            # "✓ send_message" for a message that never left, and let the agent
+            # follow up with a question the ring cannot answer.
+            raise ValueError('\n'.join(lines))
         except ValueError as e:
             return [types.TextContent(type='text', text=str(e))]
         except req.exceptions.RequestException as e:

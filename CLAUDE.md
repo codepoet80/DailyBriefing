@@ -654,6 +654,42 @@ The context also says to read each message against the previous one — a bare
 fragment right after a texting exchange is the message he wants sent, not a
 stray remark.
 
+### The agent never reads CLAUDE.md — rules live in the prompt
+
+This file is documentation for whoever is editing the code. **No runtime code
+loads it.** The ring agent's actual rules come from three places:
+
+| Where | What |
+|---|---|
+| `webhook.php` `$DEFAULT_CLIENT_CONTEXT` | ring-specific rules (the two rules, capture-on-doubt, reply shape) |
+| `chat_handler.py` `_build_stable_system_text()` | shared assistant rules, tool guidance, briefing schema |
+| `config.webhook.system_prompt_extra` / `chat_agent.system_prompt_extra` | per-install additions, no code edit needed |
+
+Writing a rule here and nowhere else changes nothing about how the agent behaves.
+
+### The two ring rules are enforced, not requested
+
+The context has banned clarifying questions since the endpoint was written, and
+the agent asked them anyway — repeatedly, on a device with no way to answer.
+Prompt text is a probability, so the rule that matters most is also enforced in
+code:
+
+**`webhook.php`: if the reply is a question and no tool call SUCCEEDED, the
+transcription is filed as a todo (`wh_force_capture()` → `src/capture_todo.py`)
+and the question is discarded**, replaced with "I wasn't sure, so I put it on
+your todo list." No model in the loop, nothing to be talked out of. The
+substitution is logged as `ENFORCE ...`.
+
+Keyed on a *successful* tool call, not merely on one being attempted. An
+ambiguous recipient used to come back `ok=True` with a pick-list — a menu
+nobody could answer — so `send_message` now **raises** on
+`AmbiguousRecipient`. Nothing was sent, so it is a failed send, and the ring
+path treats it as doubt and captures.
+
+Question detection is a trailing `?` after stripping quotes and brackets:
+answers to Jon's questions do not end that way, and clarifying questions always
+do.
+
 ### Known mis-transcriptions (`webhook.transcription_fixes`)
 
 The ring's speech-to-text mishears the same command openings repeatedly —

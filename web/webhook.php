@@ -55,6 +55,21 @@ $DEFAULT_CLIENT_CONTEXT =
     . "like a fragment is usually the continuation of the exchange in progress — "
     . "if your last turn was about texting someone, a bare phrase is the message "
     . "he wants sent, not a stray remark.\n\n"
+    . "THE TWO RULES OF THIS CHANNEL, above everything else:\n"
+    . "1. IF IN DOUBT, PUT IT ON THE TODO LIST. Any uncertainty at all — garbled "
+    . "words, unclear intent, missing details — resolves to add_todo with your "
+    . "best literal reading plus ' [via ring]'. Never drop it, never defer it, "
+    . "never ask about it.\n"
+    . "2. OTHERWISE, JUST DO WHAT HE SAID. No follow-up questions, no "
+    . "negotiating, no suggesting a better approach, no explaining why you would "
+    . "have done it differently. He is not able to reply, so anything other than "
+    . "doing it or filing it is a dead end.\n"
+    . "Do not argue with him, correct him, or push back on an instruction. If you "
+    . "think he is wrong, you are still not able to discuss it on this channel — "
+    . "do the thing, or file it. These two rules are enforced downstream: a reply "
+    . "that asks a question with no action behind it gets his words filed as a "
+    . "todo automatically and your question discarded. So asking accomplishes "
+    . "nothing except making the result worse.\n\n"
     . "NEVER ask a clarifying question. You cannot have a conversation over this "
     . "channel — Jon is talking to a ring with no screen and may not read the push "
     . "for hours, so a question just strands the request. If you are not confident "
@@ -133,6 +148,42 @@ function wh_auth_token()
         return trim($m[1]);
     }
     return $raw;
+}
+
+/**
+ * Ring rule 1, enforced rather than requested: if in doubt, it goes on the
+ * todo list.
+ *
+ * The ring cannot display or answer a question, so a question-shaped reply with
+ * no action behind it is a silently dropped request. The client context has
+ * banned clarifying questions since day one and the agent still asks them, so
+ * compliance is not something to keep hoping for. When it happens we file the
+ * transcription ourselves, with no model in the loop.
+ */
+function wh_force_capture($base, $text)
+{
+    $python = $base . '/.venv/bin/python3';
+    $script = $base . '/src/capture_todo.py';
+    if (!is_executable($python) || !file_exists($script)) { return false; }
+    $title = trim($text);
+    if ($title === '') { return false; }
+    if (strpos($title, '[via ring]') === false) { $title .= ' [via ring]'; }
+    $cmd = escapeshellarg($python) . ' ' . escapeshellarg($script) . ' '
+         . escapeshellarg($title) . ' 2>&1';
+    $out = array(); $rc = 0;
+    @exec($cmd, $out, $rc);
+    return $rc === 0;
+}
+
+/**
+ * Is this reply asking Jon something rather than telling him something?
+ * A trailing '?' is the reliable signal — answers to his questions do not end
+ * that way, and the agent's clarifying questions always do.
+ */
+function wh_is_question($reply)
+{
+    $t = rtrim(trim($reply), " \t\n\r\0\x0B\"'”’)");
+    return $t !== '' && substr($t, -1) === '?';
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -322,6 +373,31 @@ $max_chars = isset($wh['max_reply_chars']) ? (int)$wh['max_reply_chars'] : 900;
 
 $events = isset($result['tool_events']) ? $result['tool_events'] : array();
 
+// ENFORCE the two ring rules. The client context states both; the agent has
+// repeatedly ignored them, and a rule the device cannot survive being broken
+// has to hold mechanically, not by persuasion.
+//
+// A reply that asks a question with no action behind it is a dropped request:
+// Jon cannot answer it, and may not read the push for hours. So file the
+// transcription and replace the reply with the truth about what happened.
+$did_something = false;
+foreach ($events as $ev) { if (!empty($ev['ok'])) { $did_something = true; break; } }
+
+$forced_capture = false;
+if (!$did_something && wh_is_question($reply)) {
+    $forced_capture = wh_force_capture($BASE, $transcription);
+    wh_log($BASE, 'ENFORCE agent asked a question with no action; '
+        . ($forced_capture ? 'captured to todo list' : 'CAPTURE FAILED'));
+    if ($forced_capture) {
+        $events[] = array(
+            'name' => 'add_todo',
+            'ok' => true,
+            'summary' => 'Added todo: ' . trim($transcription) . ' [via ring]',
+        );
+        $reply = "I wasn't sure, so I put it on your todo list.";
+    }
+}
+
 $tool_names = array();
 foreach ($events as $ev) {
     if (!empty($ev['name'])) { $tool_names[] = $ev['name'] . (empty($ev['ok']) ? ' (failed)' : ''); }
@@ -404,5 +480,5 @@ echo json_encode(array(
     'reply'       => $reply,
     'text'        => $reply,
     'pushed'      => $pushed,
-    'tool_events' => isset($result['tool_events']) ? $result['tool_events'] : array(),
+    'tool_events' => $events,   // includes a forced capture, if one happened
 ));
