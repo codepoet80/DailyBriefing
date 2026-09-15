@@ -201,7 +201,10 @@ def _exercise_summary(cfg, days):
     last_kind = ''
     if rows:
         last = max(rows, key=lambda r: (r.get('date', ''), r.get('ts', '')))
-        last_kind = last.get('kind', '') or last.get('intensity', '')
+        # Intensity is no longer tracked. Historical rows still carry it, but
+        # showing "moderate" as the activity name is meaningless now, so the
+        # old fallback is gone — an entry with no kind simply has none.
+        last_kind = last.get('kind', '')
 
     target = cfg.get('exercise', {}).get('weekly_target_minutes')
     weeks = int(cfg.get('chart_weeks', 6))

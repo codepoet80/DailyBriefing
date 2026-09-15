@@ -25,6 +25,40 @@ CONVERSATIONS_DIR = os.path.join(DATA_DIR, 'conversations')
 app = Server('daily-briefing-agent')
 
 
+def _schedule_job(job, delay_minutes):
+    """Write a job for the launchd sweeper and, for short delays, also start a
+    precise one-shot timer. Shared by send_message and send_notification so
+    both get the same durability: the file is the record, the timer is only
+    punctuality, and nothing is deleted until delivery is confirmed.
+    Returns the due datetime."""
+    import uuid
+    from datetime import datetime, timedelta, timezone
+    send_at = datetime.now() + timedelta(minutes=delay_minutes)
+    job = dict(job, send_at=send_at.astimezone(timezone.utc).isoformat(), attempts=0)
+    sched_dir = os.path.join(DATA_DIR, 'scheduled_messages')
+    os.makedirs(sched_dir, exist_ok=True)
+    job_path = os.path.join(sched_dir, f'{uuid.uuid4()}.json')
+    with open(job_path, 'w') as f:
+        json.dump(job, f)
+
+    if delay_minutes < SWEEP_INTERVAL_MINUTES:
+        worker = os.path.join(BASE_DIR, 'src', 'scheduled_send.py')
+        venv_python = os.path.join(BASE_DIR, '.venv', 'bin', 'python3')
+        python = venv_python if os.path.exists(venv_python) else sys.executable
+        log = open(os.path.join(DATA_DIR, 'scheduled_send.log'), 'a')
+        subprocess.Popen(
+            [python, worker, 'once', job_path],
+            stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+            start_new_session=True, cwd=BASE_DIR,
+        )
+    return send_at
+
+
+def _when_phrase(send_at, delay_minutes):
+    when = send_at.replace(second=0, microsecond=0).strftime('%-I:%M %p')
+    precise = delay_minutes < SWEEP_INTERVAL_MINUTES
+    return ('at ' if precise else f'within {SWEEP_INTERVAL_MINUTES} min of ') + when
+
 def _load_briefing():
     try:
         with open(os.path.join(DATA_DIR, 'briefing.json')) as f:
@@ -217,7 +251,11 @@ async def list_tools():
         ),
         types.Tool(
             name='send_notification',
-            description="Send a Pushover notification to Jon's phone",
+            description=(
+                "Send a Pushover notification to Jon's phone. Use delay_minutes "
+                'to schedule it for later — this is the right tool for "remind '
+                'me in 30 minutes" or "ping me at 4pm".'
+            ),
             inputSchema={
                 'type': 'object',
                 'properties': {
@@ -226,6 +264,11 @@ async def list_tools():
                     'priority': {
                         'type': 'integer',
                         'description': '-1 quiet, 0 normal, 1 high (requires acknowledge)',
+                        'default': 0,
+                    },
+                    'delay_minutes': {
+                        'type': 'integer',
+                        'description': 'Minutes from now to send. 0 or omitted = send immediately.',
                         'default': 0,
                     },
                 },
@@ -519,18 +562,14 @@ async def list_tools():
             name='log_exercise',
             description=(
                 'Log an exercise session. The chat agent extracts duration in '
-                'minutes and intensity ("light"/"moderate"/"vigorous") from the '
-                "user's description. ALWAYS include raw_input."
+                "minutes from the user's description. Intensity is deliberately "
+                'not tracked — all exercise counts the same. ALWAYS include '
+                'raw_input.'
             ),
             inputSchema={
                 'type': 'object',
                 'properties': {
                     'minutes':   {'type': 'number',  'description': 'Duration in minutes.'},
-                    'intensity': {
-                        'type': 'string',
-                        'enum': ['light', 'moderate', 'vigorous'],
-                        'description': 'Perceived intensity.',
-                    },
                     'kind':      {'type': 'string', 'description': 'Free-text kind (e.g. "run", "yoga").'},
                     'raw_input': {'type': 'string', 'description': "User's original description."},
                     'date': {
@@ -538,7 +577,7 @@ async def list_tools():
                         'description': 'Optional ISO date YYYY-MM-DD. Defaults to today.',
                     },
                 },
-                'required': ['minutes', 'intensity', 'raw_input'],
+                'required': ['minutes', 'raw_input'],
             },
         ),
         types.Tool(
@@ -644,6 +683,22 @@ async def call_tool(name: str, arguments: dict):
         user_key = agent_cfg.get('pushover_user_key', '')
         if not app_token or not user_key:
             return [types.TextContent(type='text', text='Pushover not configured in config.json agent section')]
+
+        delay_minutes = int(arguments.get('delay_minutes', 0) or 0)
+        if delay_minutes > 0:
+            # Same durable path as a delayed text: the job file is the record,
+            # the launchd sweeper delivers it, and a short delay also gets a
+            # precise timer. Nothing here sleeps inside the MCP server, which is
+            # torn down at the end of the request.
+            send_at = _schedule_job({
+                'channel': 'notification',
+                'title': title, 'message': message, 'priority': priority,
+                'display_name': 'Pushover',
+            }, delay_minutes)
+            return [types.TextContent(
+                type='text',
+                text=f'Scheduled push {_when_phrase(send_at, delay_minutes)}: {title}')]
+
         payload = {
             'token': app_token, 'user': user_key,
             'title': title, 'message': message, 'priority': priority,
@@ -1171,20 +1226,19 @@ async def call_tool(name: str, arguments: dict):
                 minutes = float(arguments['minutes'])
             except (KeyError, TypeError, ValueError):
                 return [types.TextContent(type='text', text='Error: minutes must be a number')]
-            intensity = arguments.get('intensity', '')
-            if intensity not in ('light', 'moderate', 'vigorous'):
-                return [types.TextContent(type='text', text='Error: intensity must be light/moderate/vigorous')]
             if minutes <= 0 or minutes > 1440:
                 return [types.TextContent(type='text', text='Error: minutes out of range')]
+            # No intensity field: all exercise counts the same. An `intensity`
+            # argument from an older client is accepted and ignored rather than
+            # rejected, so a stale caller logs the workout instead of failing.
             entry = {
                 'ts': now, 'date': local_date,
                 'minutes': int(round(minutes)),
-                'intensity': intensity,
                 'kind': arguments.get('kind', ''),
                 'raw_input': arguments.get('raw_input', '').strip(),
             }
             path = os.path.join(health_dir, 'exercise.jsonl')
-            reply = (f'Logged {entry["minutes"]} min of {intensity} '
+            reply = (f'Logged {entry["minutes"]} min of '
                      f'{entry["kind"] or "exercise"} on {local_date}.')
         else:  # log_joy
             try:

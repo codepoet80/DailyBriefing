@@ -217,6 +217,27 @@ def _errored_copy(cfg, job, send_at):
     return any(_matches_job(m, job) and (m.get('error') or 0) != 0 for m in msgs)
 
 
+
+def _send_notification(config, job):
+    """Deliver a scheduled Pushover push. Raises on failure.
+
+    Unlike a text, there is no history to read back, so the accepted-vs-
+    delivered check that guards message sends does not apply here. Pushover
+    answers synchronously with a clear HTTP status, so "the POST succeeded" is
+    the best available signal — and a duplicate reminder is a far smaller
+    problem than a missed one.
+    """
+    from run_agent import send_pushover
+    agent = config.get('agent', {})
+    token, user = agent.get('pushover_app_token'), agent.get('pushover_user_key')
+    if not token or not user:
+        raise RuntimeError('pushover not configured in config.agent')
+    ok = send_pushover(token, user, job.get('title', 'Reminder'),
+                       job.get('message', ''), int(job.get('priority', 0)))
+    if ok is False:
+        raise RuntimeError('pushover rejected the notification')
+    return ok
+
 def _move(job_path, dest_dir):
     os.makedirs(dest_dir, exist_ok=True)
     dest = os.path.join(dest_dir, os.path.basename(job_path))
@@ -253,7 +274,8 @@ def process_job(cfg, config, job_path, now):
         return 'pending'
 
     # Already out? Covers a previous attempt that timed out but landed anyway.
-    if already_delivered(cfg, job, send_at):
+    # Only meaningful for messages: Pushover exposes no sent-history to read.
+    if job.get('channel') != 'notification' and already_delivered(cfg, job, send_at):
         _log('already delivered to %s — closing job' % who)
         _move(job_path, EXPIRED_DIR)
         return 'already-delivered'
@@ -279,7 +301,8 @@ def process_job(cfg, config, job_path, now):
             accepted_dt = datetime.fromisoformat(accepted_at)
         except ValueError:
             accepted_dt = None
-        if accepted_dt and not _errored_copy(cfg, job, send_at):
+        if (accepted_dt and job.get('channel') != 'notification'
+                and not _errored_copy(cfg, job, send_at)):
             if now - accepted_dt < RESEND_GRACE:
                 _log('%s: accepted %s ago, still unconfirmed — waiting, not resending'
                      % (who, _human(now - accepted_dt)))
@@ -301,6 +324,18 @@ def process_job(cfg, config, job_path, now):
             return 'failed'
         _save(job_path, job)
         return 'retry'
+
+    # Pushover jobs take a different route and have no message history to
+    # verify against — see _send_notification.
+    if job.get('channel') == 'notification':
+        try:
+            _send_notification(config, job)
+        except Exception as e:
+            job['last_error'] = str(e)[:300]
+            return give_up_or_retry()
+        _log('pushed to %s: %s' % (who, (job.get('title') or '')[:60]))
+        os.remove(job_path)
+        return 'sent'
 
     try:
         if job['kind'] == 'chat':

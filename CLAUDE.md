@@ -279,8 +279,8 @@ Auth is the server password passed as a `password` query param; every response i
 
 ## Delayed Sends (`scheduled_send.py` + launchd)
 
-`send_message` with `delay_minutes` **only writes a job file** —
-`data/scheduled_messages/<uuid>.json`. Delivery belongs to a launchd agent that
+`send_message` **and `send_notification`** with `delay_minutes` **only write a
+job file** — `data/scheduled_messages/<uuid>.json`. Delivery belongs to a launchd agent that
 sweeps that directory **every 10 minutes**:
 
 ```
@@ -292,6 +292,28 @@ launchctl kickstart -p gui/$(id -u)/net.jonathanwise.dailybriefing.scheduler   #
 So a message is sent within 10 minutes of its due time, not to the second.
 `StartInterval` (not `StartCalendarInterval`) so a sweep missed while the Mac
 slept runs on wake instead of being skipped.
+
+### Two channels
+
+A job's `channel` field picks the delivery route:
+
+| `channel` | Delivered by | Job fields |
+|---|---|---|
+| absent / `message` | BlueBubbles | `kind`, `target`, `service`, `message` |
+| `notification` | Pushover | `title`, `message`, `priority` |
+
+"Remind me in 30 minutes" is a **timed push**, not a todo. `send_notification`
+gained `delay_minutes` because it lacked one: the tool was in the allowlist and
+the agent knew about it, but had no way to express "later", so it asked a
+question and the ring's enforcement filed the request as a todo instead. Both
+send tools now share `_schedule_job()`, so both get the same durability — job
+file as the record, sweeper as the delivery mechanism, one-shot timer for
+delays under the sweep interval.
+
+Notification jobs skip the `already_delivered` / `_errored_copy` checks:
+Pushover exposes no sent-history to read back, so "the POST succeeded" is the
+only available signal. A duplicate reminder is a much smaller problem than a
+missed one.
 
 ### Why it works this way
 
@@ -786,7 +808,7 @@ Four metrics, four append-only JSONL files under `data/health/`:
 |---|---|
 | `weight.jsonl` | `{ts, date, pounds, note}` |
 | `alcohol.jsonl` | `{ts, date, drinks, raw_input, items:[{kind,count}]}` |
-| `exercise.jsonl` | `{ts, date, minutes, intensity, kind, raw_input}` |
+| `exercise.jsonl` | `{ts, date, minutes, kind, raw_input}` — rows written before 2026-09-11 also carry `intensity`, now ignored |
 | `joy.jsonl` | `{ts, date, rating, note}` — subjective mood, 1-5 (5 = most joyful); half-steps allowed, snapped to nearest 0.5 |
 
 ### Logging via the chat agent
@@ -794,7 +816,12 @@ Four metrics, four append-only JSONL files under `data/health/`:
 The chat agent converts natural language into structured values **in-conversation** and passes both the parsed numbers AND the user's original wording (as `raw_input`) to the log tools — no second LLM hop server-side. Built-in cheat sheet is in `chat_handler.py`'s stable system prompt:
 
 - **Alcohol** = US standard drinks (14g pure ethanol). 5oz wine = 12oz 5% beer = 1.5oz spirit = 1. Wine bottle = 5; shared bottle = 2.5 each. Double pour / old fashioned / martini ≈ 2.
-- **Exercise** = minutes + intensity (`light`/`moderate`/`vigorous`) + free-text kind. Rough fallback estimates: "ran 3 miles" ≈ 30 min vigorous, "yoga class" ≈ 60 min moderate.
+- **Exercise** = minutes + free-text kind. **Intensity is deliberately not
+  tracked** — at Jon's age all exercise counts the same, so the agent must never
+  ask how hard a session was. Rough fallback estimates: "ran 3 miles" ≈ 30 min,
+  "yoga class" ≈ 60 min, "lifted" ≈ 45 min; estimate rather than asking.
+  `log_exercise` still accepts and ignores an `intensity` argument so a stale
+  caller logs the workout instead of erroring.
 - **Weight** = pounds. Agent multiplies if user gives kg.
 - **Joy** = 1-5 (5 = most joyful); half-steps like 3.5 allowed (snapped to nearest 0.5). Agent maps free-text mood to the scale ("great day" ≈ 5, "meh" ≈ 3, "awful" ≈ 1); original wording goes in `note`. One rating per day (latest wins, like weight).
 

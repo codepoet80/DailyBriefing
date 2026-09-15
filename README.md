@@ -275,7 +275,7 @@ Each metric appends to `data/health/*.jsonl` and renders latest value, weekly to
 - **Weight** and **joy** show a 30-day daily sparkline (joy pinned to a fixed `1..scale_max` scale so bar heights read as absolute mood).
 - **Alcohol** and **exercise** show a **weekly bar chart** (one Sun–Sat bar vs the weekly target line — green on-target, red off, gray for the in-progress week).
 
-Log in plain English via the chat — "shared a bottle of wine with Nicole" or "ran 4 miles this morning" — and the agent converts to US standard drinks / minutes+intensity in-conversation before logging (no second server-side LLM hop). Add a `health_missing` entry to `agent_rules.json` to get a Pushover reminder when a metric hasn't been logged today.
+Log in plain English via the chat — "shared a bottle of wine with Nicole" or "ran 4 miles this morning" — and the agent converts to US standard drinks / minutes in-conversation before logging (no second server-side LLM hop). Add a `health_missing` entry to `agent_rules.json` to get a Pushover reminder when a metric hasn't been logged today.
 
 ## Dialectics
 
