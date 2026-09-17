@@ -135,6 +135,68 @@ Rendered as a slim green/amber banner right below the remote Server Status banne
 (reuses the `.section-servers` styles). The `local_services` agent rule pushes a
 priority-1 alert when any service is down.
 
+## Heartbeats (`fetch_heartbeats.py` + `web/heartbeat.php`)
+
+Dead-man's-switch monitoring for machines that **cannot be polled from here**.
+`fetch_servers.py` polls remote status pages and `fetch_local_services.py`
+checks processes on this box; this third kind covers a machine that accepts no
+inbound connection — the locked-down work laptop running Outlook for calendar
+sync. It pushes; we alarm on **silence**.
+
+That direction is the whole point. A "tell me when it breaks" agent cannot
+report its own death, a power-off, or a dead network. Absence of signal covers
+all three plus everything unforeseen.
+
+### Two failure modes, two detection speeds
+
+| Failure | Signal | Noticed |
+|---|---|---|
+| Outlook died or wedged | heartbeat arrives with `ok: false` | next build after one heartbeat interval |
+| Laptop off / network down / script dead | no heartbeat at all | after `stale_minutes` |
+
+Keeping them separate matters: staleness alone would make the first case wait
+out the full timeout. A machine that has **never** reported reads as stale, not
+as healthy.
+
+### Endpoint
+
+`POST web/heartbeat.php` with `Authorization: Bearer <heartbeats.token>`, JSON
+body or form fields: `name` (required), `ok`, `status`, `detail`, `extra`.
+Writes `data/heartbeats/<name>.json` via write-then-rename so a concurrent build
+never reads a half-written file. **LAN only — do not publish this through the
+public nginx proxy** the way `webhook.php` is.
+
+### The Windows side (`tools/windows/outlook_heartbeat.py`)
+
+Scheduled Task every 5 minutes. Each run: check `OUTLOOK.EXE`, **relaunch it if
+missing**, check that the `.ost` file has been written recently, then POST the
+result.
+
+The relaunch is the part that earns its keep — monitoring alone means a trip to
+the basement every time a Windows Update kills Outlook. Self-healing turns most
+incidents into an FYI. The `.ost` mtime check exists because a running
+`OUTLOOK.EXE` is not a syncing one: Outlook can hold a wedged connection with a
+live process, which is the exact silent failure that motivated this.
+
+### Tuning
+
+`stale_minutes` (25) is deliberately well above a Windows Update reboot cycle —
+with autologon and Outlook in startup, a patch reboot is a few minutes of
+silence and must not page anyone. Heartbeat every 5 min against a 25 min window
+tolerates four consecutive misses.
+
+Measured on the real laptop: a full reboot produced an **8m 27s** gap
+(2026-09-17), so the 25 min window carries about 3× headroom. The scheduled
+task resumed by itself afterwards and settled back to a 5:00 cadence.
+
+The `heartbeat` agent rule runs at `pushover_priority: 0` so it respects
+Pushover quiet hours. Note the briefing cron is `0/30 5-21`, so there is **no
+build between 22:00 and 04:59** — an overnight failure surfaces at the 05:00
+run, which is the intended behaviour, not a gap. Its `item_key` encodes
+*which* problem (`stale` vs `not_ok`), so a box that goes silent and later
+returns reporting Outlook down raises a fresh alert instead of being swallowed
+by the dedupe window.
+
 ## Todos (`fetch_todos.py`)
 
 Reads whatever `todos.command` prints, keeping lines matching `○/● N. Title`

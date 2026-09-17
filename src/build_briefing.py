@@ -16,6 +16,7 @@ from fetch_todos import fetch_todos
 from fetch_weather import fetch_weather
 from fetch_servers import fetch_servers
 from fetch_local_services import fetch_local_services
+from fetch_heartbeats import fetch_heartbeats
 from fetch_news import fetch_news
 from cluster_news import cluster_stories, dedupe_geek_news
 from fetch_geek_news import fetch_geek_news
@@ -137,6 +138,9 @@ def main():
     print('  Fetching GitHub notifications...')
     github = fetch_github(config)
 
+    print('  Checking heartbeats...')
+    heartbeats = fetch_heartbeats(config)
+
     print('  Fetching reading progress...')
     reading = fetch_reading(config)
 
@@ -163,6 +167,7 @@ def main():
         'imessage': imessage,
         'github': github,
         'reading': reading,
+        'heartbeats': heartbeats,
         'health': health,
     }
 

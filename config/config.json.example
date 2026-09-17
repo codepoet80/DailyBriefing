@@ -217,5 +217,17 @@
       "robin": "f",
       "jo": "f"
     }
+  },
+  "heartbeats": {
+    "enabled": true,
+    "token": "",
+    "stale_minutes": 25,
+    "machines": [
+      {
+        "name": "work-laptop",
+        "label": "Work laptop (Outlook sync)",
+        "stale_minutes": 25
+      }
+    ]
   }
 }

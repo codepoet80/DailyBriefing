@@ -28,6 +28,7 @@ $greeting        = isset($briefing['greeting'])        ? $briefing['greeting']  
 $verse           = isset($briefing['verse'])           ? $briefing['verse']           : array();
 $servers         = isset($briefing['servers'])         ? $briefing['servers']         : null;
 $local_services  = isset($briefing['local_services'])  ? $briefing['local_services']  : null;
+$heartbeats      = isset($briefing['heartbeats'])      ? $briefing['heartbeats']      : null;
 $weather         = isset($briefing['weather'])         ? $briefing['weather']         : null;
 $my_calendar     = isset($briefing['my_calendar'])     ? $briefing['my_calendar']     : array();
 $todos           = isset($briefing['todos'])           ? $briefing['todos']           : array();
@@ -113,6 +114,35 @@ $regular_count = count($news_regular);
     <span class="servers-icon">! </span> App Service Down:
     <?php $down = array(); foreach ($local_services['services'] as $svc) { if (!$svc['up']) { $down[] = $svc['name']; } } ?>
     <?php echo h(implode(', ', $down)); ?>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($heartbeats && !empty($heartbeats['machines'])): ?>
+<div class="section section-servers <?php echo $heartbeats['all_ok'] ? 'servers-up' : 'servers-down'; ?>">
+    <?php if ($heartbeats['all_ok']): ?>
+    <span class="servers-icon">&#8730; </span> Heartbeats OK<?php
+    // A machine that healed itself is "ok" and raises no alert, but saying so
+    // is the difference between "fine" and "fine, because it restarted Outlook
+    // again" — the latter is how a recurring killer gets noticed.
+    $hb_notes = array();
+    foreach ($heartbeats['machines'] as $m) {
+        $st = isset($m['status']) ? $m['status'] : '';
+        if (!empty($m['ok']) && $st !== '' && $st !== 'ok') {
+            $hb_notes[] = $m['label'] . ': ' . str_replace('_', ' ', $st);
+        }
+    }
+    if ($hb_notes) { echo ' &mdash; ' . h(implode('; ', $hb_notes)); }
+    ?>
+    <?php else: ?>
+    <span class="servers-icon">! </span>
+    <?php
+    $hb_bad = array();
+    foreach ($heartbeats['machines'] as $m) {
+        if (empty($m['ok'])) { $hb_bad[] = $m['label'] . ' — ' . $m['problem']; }
+    }
+    echo h(implode('; ', $hb_bad));
+    ?>
     <?php endif; ?>
 </div>
 <?php endif; ?>

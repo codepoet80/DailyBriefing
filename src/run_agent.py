@@ -111,6 +111,24 @@ def evaluate_rules(briefing, rules):
                         'summary': f"App service down: {', '.join(down)}",
                     })
 
+        elif rule_type == 'heartbeat':
+            hb = briefing.get('heartbeats') or {}
+            bad = [m for m in hb.get('machines', []) if not m.get('ok', True)]
+            if bad:
+                # Key on the problem, not just the machine name, so a box that
+                # goes silent and later comes back reporting Outlook down is a
+                # new alert rather than one suppressed by the dedupe window.
+                key = ':'.join(sorted(
+                    '%s=%s' % (m['name'], 'stale' if m.get('stale') else 'not_ok')
+                    for m in bad))
+                lines = ['%s: %s' % (m['label'], m['problem']) for m in bad]
+                candidates.append({
+                    'rule': rule,
+                    'item_key': key,
+                    'data': {'machines': bad},
+                    'summary': 'Heartbeat problem — ' + '; '.join(lines),
+                })
+
         elif rule_type == 'security':
             unifi = briefing.get('unifi')
             if unifi and unifi.get('total_events', 0) > 0:
